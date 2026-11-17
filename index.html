@@ -148,12 +148,11 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     <span class="info"><span id="srcInfo">A carregar…</span><span id="anaInfo"></span></span>
     <button type="button" class="btn" id="toolsBtn" aria-expanded="false" aria-controls="toolsPanel">Calculadora e calendário</button>
     <button type="button" class="btn" id="pickDir" title="Pasta do SharePoint sincronizada com os ficheiros Alocação…xlsx da Alexandra">Escolher pasta</button>
-    <button type="button" class="btn" id="pickCtl" title="Pasta 'App Alocação Animais' (ou a subpasta _controlo) sincronizada do SharePoint: análises Marrocos, certificados Angus, origens e dados da verificação diária">Ligar pasta da app</button>
+    <button type="button" class="btn" id="pickCtl" hidden title="Pasta 'App Alocação Animais' (ou a subpasta _controlo) sincronizada do SharePoint: análises Marrocos, certificados Angus, origens e dados da verificação diária">Ligar pasta da app</button>
     <label class="btn" for="fileIn" style="display:inline-flex;align-items:center">Abrir ficheiro…</label>
     <button type="button" class="btn primary" id="refresh">Atualizar com a versão mais recente</button>
     <input id="fileIn" type="file" accept=".xlsx,.xlsm" hidden>
     <input id="dirIn" type="file" webkitdirectory hidden>
-    <input id="ctlIn" type="file" webkitdirectory hidden>
   </div>
 </header>
 <nav class="tabs" aria-label="Separadores"><button type="button" data-tab="home">Início</button><button type="button" data-tab="sim">Simulador</button><button type="button" data-tab="panel">Painel de alocações</button><button type="button" data-tab="aloc">Alocações</button><button type="button" data-tab="angus">Programação de cargas</button><button type="button" data-tab="efe">Efetivo (listagem)</button></nav>
@@ -335,7 +334,7 @@ const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 
 const MK = {
-  israel: { label: 'Israel – engorda', exp: true, travel: 10, fco: 60, ehd: 60, rules: ['Primovacinação DHE há 60 dias ou mais na data de saída (opção anticorpos do certificado DGAV)', 'Quarentena há 35 dias ou mais na data de saída', 'Sem etiqueta de risco, coabitante, observação ou enfermaria', 'Fêmeas com menos de 15 meses à chegada (saída + 10 dias de viagem)', 'Primovacinação da língua azul há 60 dias ou mais', 'Machos entre 350 e 650 kg à saída'], mKg: [350, 650], check: (a, L) => (a.m === 0 && months(a.b, L + 10) >= 15) ? 'Fêmea com 15 meses ou mais à chegada' : null },
+  israel: { label: 'Israel – engorda', exp: true, travel: 10, fco: 60, ehd: 60, rules: ['Primovacinação DHE há 60 dias ou mais na data de saída (opção anticorpos do certificado DGAV)', 'Quarentena há 35 dias ou mais na data de saída', 'Sem etiqueta de risco, coabitante, observação ou enfermaria', 'Fêmeas com menos de 15 meses à chegada (saída + 10 dias de viagem)', 'Primovacinação da língua azul há 60 dias ou mais', 'Sem peso mínimo nem máximo (definir no lote, se necessário)'], check: (a, L) => (a.m === 0 && months(a.b, L + 10) >= 15) ? 'Fêmea com 15 meses ou mais à chegada' : null },
   marrocos: { label: 'Marrocos – abate/engorda', exp: true, travel: 0, fco: 45, ehd: 45, proto: 15, rules: ['Quarentena há 35 dias ou mais na data de saída', 'Sem etiqueta de risco, coabitante, observação ou enfermaria', 'Menos de 24 meses à saída', 'Primovacinação da língua azul há 45 dias ou mais', 'Primovacinação DHE há 45 dias ou mais', 'Sem animais Angus', '2.ª parte do protocolo (análises) colhida pelo menos 15 dias antes da saída (indicação, não exclui)'], check: (a, L) => /angus/i.test(a.breed) ? 'Angus (não vai para Marrocos)' : (months(a.b, L) >= 24 ? 'Idade fora do limite do mercado' : null) },
   argeliaE: { label: 'Argélia – engorda', exp: true, travel: 0, fco: 45, rules: ['Quarentena há 35 dias ou mais na data de saída', 'Sem etiqueta de risco, coabitante, observação ou enfermaria', 'Menos de 18 meses (certificado DGAV)', 'Vacinação da língua azul há 45 dias ou mais'], check: (a, L) => months(a.b, L) >= 18 ? 'Idade fora do limite do mercado' : null },
   argeliaA: { label: 'Argélia – abate', exp: true, travel: 0, fco: 0, rules: ['Quarentena há 35 dias ou mais na data de saída', 'Sem etiqueta de risco, coabitante, observação ou enfermaria', 'Entre 14 e 28 meses (certificado DGAV)', 'Vacinados contra a língua azul'], check: (a, L) => { const m = months(a.b, L); return (m < 14 || m > 28) ? 'Idade fora do limite do mercado' : null; } },
@@ -1524,51 +1523,16 @@ async function readCtl(h, ask) {
   for (const [f, v] of CTL_FILES) { try { const fh = await d.getFileHandle(f); const tx = await (await fh.getFile()).text(); const o = JSON.parse(tx.slice(tx.indexOf('=') + 1).trim().replace(/;\s*$/, '')); window[v] = o; got.push(f); } catch (e) {} }
   return got;
 }
-function updateCtlData(loaded) {
-  const w = loaded.includes('dados_alocacao.js') ? window.DADOS_ALOCACAO : null;
-  if (w && w.rows && (!DB || !DB.mtime || w.mtime > DB.mtime)) {
-    DB = fromSnapshot(w);
-    setInfo(DB.source + ' · ' + nf(DB.rows.length) + ' animais');
-  }
-  if (DB && DB.rows) gmdFill(DB.rows);
+async function applyCtl(h, ask) {
+  const got = await readCtl(h, ask); if (!got) { if (ask) setInfo('Sem acesso à pasta da app ' + h.name + '.'); return; }
+  if (!got.length) { if (ask) setInfo('Na pasta ' + h.name + ' não encontrei os ficheiros de dados (_controlo).'); return; }
+  const w = window.DADOS_ALOCACAO; if (w && w.rows && (!DB || !DB.mtime || w.mtime > DB.mtime)) { DB = fromSnapshot(w); gmdFill(DB.rows); $('srcInfo').textContent = DB.source + ' · ' + nf(DB.rows.length) + ' animais'; }
+  else if (DB && DB.rows) gmdFill(DB.rows);
   loadAna(); $('anaInfo').textContent = anaInfoText(); render();
 }
-async function applyCtl(h, ask) {
-  const got = await readCtl(h, ask);
-  if (!got) { if (ask) setInfo('Sem acesso à pasta da app ' + h.name + '.'); return; }
-  if (!got.length) { if (ask) setInfo('Na pasta ' + h.name + ' não encontrei os ficheiros de dados (_controlo).'); return; }
-  updateCtlData(got);
-  if (ask) setInfo(DB.source + ' · pasta da app atualizada (' + got.length + ' ficheiros)');
-}
+if (ONLINE && CAN_DIR) $('pickCtl').hidden = false;
 $('pickCtl').onclick = async () => {
-  if (!CAN_DIR) { $('ctlIn').click(); return; }
-  try {
-    const h = await window.showDirectoryPicker({ id: 'mdp-app', mode: 'read' });
-    await IDB.set('ctl', h);
-    await applyCtl(h, true);
-  } catch (e) {
-    if (!e || e.name !== 'AbortError') $('ctlIn').click();
-  }
-};
-$('ctlIn').onchange = async (e) => {
-  const files = Array.from(e.target.files || []);
-  e.target.value = '';
-  const loaded = [];
-  for (const [name, key] of CTL_FILES) {
-    const file = files.find((f) => {
-      const parts = f.webkitRelativePath.split('/');
-      return f.name === name && (parts.length === 2 || (parts.length === 3 && parts[1].toLowerCase() === '_controlo'));
-    });
-    if (!file) continue;
-    try {
-      const tx = await file.text();
-      window[key] = JSON.parse(tx.slice(tx.indexOf('=') + 1).trim().replace(/;\s*$/, ''));
-      loaded.push(name);
-    } catch (e) {}
-  }
-  if (!loaded.length) { setInfo('Não encontrei ficheiros de dados válidos na pasta da app.'); return; }
-  updateCtlData(loaded);
-  setInfo(DB.source + ' · pasta da app atualizada (' + loaded.length + ' ficheiros)');
+  try { const h = await window.showDirectoryPicker({ id: 'mdp-app', mode: 'read' }); await IDB.set('ctl', h); await applyCtl(h, true); } catch (e) { if (!e || e.name !== 'AbortError') setInfo('Não foi possível ler a pasta da app.'); }
 };
 const ST_KEYS = ['mdp-negocios-v1', 'mdp-reservas-v1', 'mdp-vendas-v1', 'mdp-hist-v1', 'mdp-datas-saida-v1', 'mdp-criterios-v1', 'mdp-cargas-v3', 'mdp-aloc-ocultas-v1', 'mdp-efetivo-v2'];
 $('stExp').onclick = () => {
@@ -1586,38 +1550,16 @@ $('stIn').onchange = async (e) => {
     location.reload();
   } catch (er) { $('stNote').textContent = 'Este ficheiro não é uma cópia de segurança da Master Allocation.'; }
 };
-async function reloadCtl() {
-  if (!ONLINE) return [];
-  const loaded = await Promise.all(CTL_FILES.map(async ([name, key]) => {
-    try {
-      const response = await fetch('_controlo/' + name, { cache: 'no-store' });
-      if (!response.ok) return null;
-      const tx = await response.text();
-      window[key] = JSON.parse(tx.slice(tx.indexOf('=') + 1).trim().replace(/;\s*$/, ''));
-      return name;
-    } catch (e) { return null; }
-  }));
-  return loaded.filter(Boolean);
+function reloadAna() {
+  const one = (f) => new Promise((res) => { const s = document.createElement('script'); s.src = '_controlo/' + f + '?t=' + Date.now(); s.onload = s.onerror = () => { s.remove(); res(); }; document.head.appendChild(s); });
+  return Promise.all([one('analises_marrocos.js'), one('angus_certificados.js'), one('origens.js')]).then(() => { if (DB && DB.rows) gmdFill(DB.rows); });
 }
 $('refresh').onclick = async () => {
-  $('refresh').disabled = true;
-  try {
-    const h = CAN_DIR ? await IDB.get('ctl') : null;
-    const dir = CAN_DIR ? await IDB.get('dir') : null;
-    const loaded = await reloadCtl();
-    if (loaded.length) {
-      updateCtlData(loaded);
-      setInfo(DB.source + ' · dados disponíveis na app verificados');
-    } else if (!h && !dir) {
-      setInfo('Não consegui atualizar os dados online. Escolha uma pasta ou abra um ficheiro Excel.');
-    }
-    if (h) await applyCtl(h, true);
-    if (dir) await refreshFromDir(dir, true);
-  } catch (e) {
-    setInfo('Não foi possível atualizar os dados: ' + e.message);
-  } finally {
-    $('refresh').disabled = false;
-  }
+  await reloadAna(); loadAna(); $('anaInfo').textContent = anaInfoText(); render();
+  if (ONLINE && CAN_DIR) { const h = await IDB.get('ctl'); if (h) await applyCtl(h, true); }
+  if (!CAN_DIR) { $('dirIn').click(); return; }
+  const dir = await IDB.get('dir');
+  if (dir) await refreshFromDir(dir, true); else $('pickDir').click();
 };
 $('dirIn').onchange = async (e) => {
   const all = Array.from(e.target.files || []).filter((f) => (f.webkitRelativePath || '').split('/').length === 2);
@@ -1627,7 +1569,7 @@ $('dirIn').onchange = async (e) => {
 };
 $('fileIn').onchange = async (e) => { const f = e.target.files[0]; if (f) await loadFile(f); e.target.value = ''; };
 (async () => {
-  if (CAN_DIR) { const h = await IDB.get('ctl'); if (h) { try { await applyCtl(h, false); } catch (e) {} } }
+  if (ONLINE && CAN_DIR) { const h = await IDB.get('ctl'); if (h) { try { await applyCtl(h, false); } catch (e) {} } }
   const dir = CAN_DIR ? await IDB.get('dir') : null;
   if (dir) { try { await refreshFromDir(dir, false, true); } catch (e) {} }
 })();
