@@ -1520,7 +1520,11 @@ async function loadFile(f) {
     DB = fromWorkbook(buf, f.name); DB.mtime = f.lastModified;
     setInfo(f.name + ' · alterado a ' + new Date(f.lastModified).toLocaleString('pt-PT') + ' · ' + nf(DB.rows.length) + ' animais');
     sel = new Set(); render();
-  } catch (err) { setInfo('Erro ao ler ' + f.name + ': ' + (err && err.message ? err.message : err)); }
+    return true;
+  } catch (err) {
+    setInfo('Erro ao ler ' + f.name + ': ' + (err && err.message ? err.message : err));
+    return false;
+  }
   finally { $('loading').style.display = 'none'; }
 }
 function newest(files) { return files.filter((f) => FILE_RX.test(f.name) && !f.name.startsWith('~$')).sort((a, b) => b.lastModified - a.lastModified)[0] || null; }
@@ -1746,8 +1750,7 @@ async function finishSharePointSignIn() {
     throw new Error('Entra com uma conta @montedopasto.pt.');
   }
   sharePointToken = { value: token.access_token, expires: Date.now() + expires * 1000 };
-  unlockApp(profile);
-  return true;
+  return profile;
 }
 const teamKeys = ['mdp-negocios-v1', 'mdp-reservas-v1', 'mdp-vendas-v1', 'mdp-hist-v1', 'mdp-datas-saida-v1'];
 let teamRevision;
@@ -1857,14 +1860,15 @@ async function refreshSharePoint() {
     loadAna();
     $('anaInfo').textContent = anaInfoText();
     const modified = Date.parse(item.lastModifiedDateTime);
-    await loadFile(new File([await workbook.blob()], item.name, {
+    const loaded = await loadFile(new File([await workbook.blob()], item.name, {
       lastModified: Number.isFinite(modified) ? modified : Date.now()
     }));
-    if (missing.length) setInfo($('srcInfo').textContent + ' · Não foi possível atualizar: ' + missing.join(', '));
+    if (loaded && missing.length) setInfo($('srcInfo').textContent + ' · Não foi possível atualizar: ' + missing.join(', '));
+    return loaded;
   } catch (e) {
     if (e.status === 401) { lockApp('A sessão expirou. Volta a entrar para continuar.'); return; }
     if (e.status === 403) {
-      setInfo('O SharePoint recusou a leitura do Excel. A app mantém a versão anterior (' + nf(DB.rows.length) + ' animais).');
+      setInfo('O SharePoint recusou a leitura do Excel.' + (DB ? ' Mantêm-se os dados já carregados (' + nf(DB.rows.length) + ' animais).' : ''));
       return;
     }
     if (e.status === 404) { setInfo('O Excel de alocação não foi encontrado na pasta da Alexandra.'); return; }
@@ -1888,8 +1892,11 @@ if (loginRequired) {
   } else if (new URLSearchParams(location.search).has('code') || new URLSearchParams(location.search).has('error')) {
     $('loginBtn').disabled = true;
     $('loginStatus').textContent = 'A verificar a conta Microsoft…';
-    finishSharePointSignIn().then((refresh) => {
-      if (refresh) return refreshSharePoint();
+    finishSharePointSignIn().then(async (profile) => {
+      if (!profile) return;
+      $('loginStatus').textContent = 'A carregar a versão atual do Excel no SharePoint…';
+      if (await refreshSharePoint()) unlockApp(profile);
+      else if (sharePointToken) lockApp($('srcInfo').textContent + ' Volta a entrar para tentar novamente.');
     }).catch((e) => lockApp(e.message));
   }
 }
@@ -1901,18 +1908,21 @@ $('dirIn').onchange = async (e) => {
 };
 $('fileIn').onchange = async (e) => { const f = e.target.files[0]; if (f) await loadFile(f); e.target.value = ''; };
 (async () => {
+  if (loginRequired) return;
   if (CAN_DIR) { const h = await IDB.get('ctl'); if (h) { try { await applyCtl(h, false); } catch (e) {} } }
   const dir = CAN_DIR ? await IDB.get('dir') : null;
   if (dir) { try { await refreshFromDir(dir, false, true); } catch (e) {} }
 })();
 
 S.tab = 'home';
-loadAna();
-const D0 = (window.DADOS_ALOCACAO && window.DADOS_ALOCACAO.rows && (!SNAPSHOT.mtime || window.DADOS_ALOCACAO.mtime > SNAPSHOT.mtime || (window.DADOS_ALOCACAO.mtime === SNAPSHOT.mtime && String(window.DADOS_ALOCACAO.gerado || '') >= String(SNAPSHOT.gerado || '')))) ? window.DADOS_ALOCACAO : SNAPSHOT;
-DB = fromSnapshot(D0);
-$('srcInfo').textContent = DB.source + ' · ' + nf(DB.rows.length) + ' animais';
-$('anaInfo').textContent = anaInfoText();
-render();
+if (!loginRequired) {
+  loadAna();
+  const D0 = (window.DADOS_ALOCACAO && window.DADOS_ALOCACAO.rows && (!SNAPSHOT.mtime || window.DADOS_ALOCACAO.mtime > SNAPSHOT.mtime || (window.DADOS_ALOCACAO.mtime === SNAPSHOT.mtime && String(window.DADOS_ALOCACAO.gerado || '') >= String(SNAPSHOT.gerado || '')))) ? window.DADOS_ALOCACAO : SNAPSHOT;
+  DB = fromSnapshot(D0);
+  $('srcInfo').textContent = DB.source + ' · ' + nf(DB.rows.length) + ' animais';
+  $('anaInfo').textContent = anaInfoText();
+  render();
+}
 </script>
 <aside id="toolsPanel" hidden aria-label="Calculadora e calendário">
   <div class="tp-h"><strong style="font-size:16px">Calculadora</strong><button type="button" class="btn" id="toolsClose" style="min-height:32px">Fechar</button></div>
