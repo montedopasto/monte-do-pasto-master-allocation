@@ -1821,9 +1821,8 @@ $('teamLoad').onclick = teamAction(loadTeamState);
 $('teamSave').onclick = teamAction(saveTeamState);
 async function sharePointFile(id) {
   const itemUrl = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/items/' + encodeURIComponent(id);
-  const select = '?' + new URLSearchParams({ '$select': 'name,lastModifiedDateTime,file,@microsoft.graph.downloadUrl' });
   const options = { cache: 'no-store', headers: { Authorization: 'Bearer ' + sharePointToken.value } };
-  const response = await fetch(itemUrl + select, options);
+  const response = await fetch(itemUrl, options);
   if (!response.ok) throw Object.assign(new Error('O SharePoint devolveu o erro ' + response.status + '.'), { status: response.status });
   const item = await response.json();
   const url = item['@microsoft.graph.downloadUrl'];
