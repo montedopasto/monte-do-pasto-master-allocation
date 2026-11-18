@@ -35,6 +35,7 @@ header .sub{font-size:12px;color:var(--muted);margin-top:2px}
 header .btn{background:#fff;border-color:#D9CFC7;color:var(--brand)}
 header .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
 main{max-width:1400px;margin:0 auto;padding:24px;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+main[hidden]{display:none!important}
 .side{flex:1 1 300px;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:18px}
 .content{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:20px}
 .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
@@ -951,7 +952,7 @@ function render() {
   if (tab === 'aloc') { renderAloc(); return; }
   if (tab === 'home') { renderHome(); return; }
   if (tab === 'angus') { renderAngus(); return; }
-  if (tab === 'panel') { renderPanel(); }
+  if (tab === 'panel') { renderPanel(); return; }
   const m = MK[S.mk];
   $('mkSeg').innerHTML = Object.keys(MK).map((k) => `<button type="button" data-mk="${k}" aria-pressed="${k === S.mk}">${esc(MK[k].label)}</button>`).join('');
   $('sexSeg').innerHTML = [['all', 'Todos'], ['M', 'Machos'], ['F', 'Fêmeas']].map(([k, l]) => `<button type="button" data-sex="${k}" aria-pressed="${k === S.sex}">${l}</button>`).join('');
