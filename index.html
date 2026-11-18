@@ -1659,7 +1659,7 @@ const SHAREPOINT = {
   authority: 'https://login.microsoftonline.com/ee417351-ea90-41e0-9147-5ea6ab38ea49/oauth2/v2.0',
   client: 'f5456ed4-ab81-441a-884f-5ecd0f752016',
   drive: 'b!tDspHS-8_06fSneRoEVGiIzQ_wwWK5dJhqGpmrL0k_yVQ7fm29iyQ7jbVXGCuMch',
-  path: ['Alexandra Silva', '2026 - Alocação de Animais', 'Alocação_Dashboard_2026_2 dvd.xlsx'],
+  path: ['documentos partilhados', 'Alexandra Silva', '2026 - Alocação de Animais', 'Alocação_Dashboard_2026_2 dvd.xlsx'],
   controlPath: ['App Alocação Animais', '_controlo'],
   scope: 'https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.Read https://graph.microsoft.com/Lists.SelectedOperations.Selected',
   teamList: 'https://graph.microsoft.com/v1.0/sites/montedopastopt.sharepoint.com,1d293bb4-bc2f-4eff-9f4a-7791a0454688,0cffd08c-2b16-4997-86a1-a99ab2f493fc/lists/bd079891-a715-41d6-89e1-f8f531f61074/items',
@@ -1815,15 +1815,12 @@ function teamAction(action) {
 }
 $('teamLoad').onclick = teamAction(loadTeamState);
 $('teamSave').onclick = teamAction(saveTeamState);
-async function sharePointFile(path, allowNested = false) {
+async function sharePointFile(path) {
   const root = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/root:/';
   const encoded = path.map(encodeURIComponent).join('/');
   const select = '?' + new URLSearchParams({ '$select': 'name,lastModifiedDateTime,file,@microsoft.graph.downloadUrl' });
   const options = { cache: 'no-store', headers: { Authorization: 'Bearer ' + sharePointToken.value } };
-  let response = await fetch(root + encoded + select, options);
-  if (allowNested && response.status === 404) {
-    response = await fetch(root + encodeURIComponent('documentos partilhados') + '/' + encoded + select, options);
-  }
+  const response = await fetch(root + encoded + select, options);
   if (!response.ok) throw Object.assign(new Error('O SharePoint devolveu o erro ' + response.status + '.'), { status: response.status });
   const item = await response.json();
   const url = item['@microsoft.graph.downloadUrl'];
@@ -1853,7 +1850,7 @@ async function refreshSharePoint() {
       await signInToSharePoint(true);
       return;
     }
-    const { item, content: workbook } = await sharePointFile(SHAREPOINT.path, true);
+    const { item, content: workbook } = await sharePointFile(SHAREPOINT.path);
     const missing = await refreshSharePointControl();
     loadAna();
     $('anaInfo').textContent = anaInfoText();
@@ -1864,7 +1861,10 @@ async function refreshSharePoint() {
     if (missing.length) setInfo($('srcInfo').textContent + ' · Não foi possível atualizar: ' + missing.join(', '));
   } catch (e) {
     if (e.status === 401) { lockApp('A sessão expirou. Volta a entrar para continuar.'); return; }
-    if (e.status === 403) { setInfo('A conta Microsoft não tem acesso ao Excel de alocação.'); return; }
+    if (e.status === 403) {
+      setInfo('O SharePoint recusou a leitura do Excel. A app mantém a versão anterior (' + nf(DB.rows.length) + ' animais).');
+      return;
+    }
     if (e.status === 404) { setInfo('O Excel de alocação não foi encontrado na pasta da Alexandra.'); return; }
     setInfo('Erro ao atualizar do SharePoint: ' + e.message);
   } finally {
