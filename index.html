@@ -12,7 +12,7 @@
 <style>
 :root{--bg:#F7F4EF;--card:#FFFFFF;--ink:#231815;--muted:#6B5F59;--line:#E6DFD7;--line2:#F1ECE6;--green:#247305;--brand:#4A0E0E;--brand2:#6B1D1A;--amber:#7A4A00;--red:#8F1F17}
 *{box-sizing:border-box}
-#loginScreen[hidden]{display:none!important}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Public Sans',system-ui,Segoe UI,sans-serif;font-size:14px}
 h1,h2{font-family:Oswald,'Arial Narrow','Segoe UI',sans-serif;font-weight:600;letter-spacing:.01em;margin:0;color:var(--brand)}
 h1{text-transform:uppercase;letter-spacing:.03em}
@@ -35,7 +35,6 @@ header .sub{font-size:12px;color:var(--muted);margin-top:2px}
 header .btn{background:#fff;border-color:#D9CFC7;color:var(--brand)}
 header .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
 main{max-width:1400px;margin:0 auto;padding:24px;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
-main[hidden]{display:none!important}
 .side{flex:1 1 300px;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:18px}
 .content{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:20px}
 .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
@@ -140,7 +139,6 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .cal-g button.mk{background:#E3EFE7}
 .cal-off{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px}
 @media (max-width:700px){.src .info{display:none}.hbrand img{height:44px}.app-name{font-size:18px}}
-#loginScreen[hidden]{display:none!important}
 html.mdp-login-required body > :not(#loginScreen){display:none!important}
 #loginScreen{min-height:100vh;display:grid;place-items:center;padding:24px;background:#f7f4ef}
 .login-card{width:min(100%,440px);padding:32px;border:1px solid var(--line);border-radius:16px;background:#fff}
