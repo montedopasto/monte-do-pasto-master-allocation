@@ -184,6 +184,14 @@ if (location.protocol !== 'file:') document.documentElement.classList.add('mdp-l
   <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;position:relative;overflow:hidden"><img src="data:image/png;base64,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" alt="" aria-hidden="true" style="position:absolute;right:-20px;top:-30px;height:150px;opacity:.10"><div><h1 style="font-size:28px">Monte do Pasto · Master Allocation</h1><p class="note" style="font-size:14px;margin:6px 0 0" id="hSub"></p></div></div>
   <section class="kpis" id="hKpis" style="width:100%"></section>
   <section id="hAlerts" style="width:100%"></section>
+  <section class="card" id="teamState" hidden style="width:100%;gap:8px">
+    <h2 style="font-size:16px">Alocações da equipa</h2>
+    <div class="rowsb" style="flex-wrap:wrap">
+      <button class="btn" type="button" id="teamLoad">Carregar do SharePoint</button>
+      <button class="btn primary" type="button" id="teamSave">Guardar no SharePoint</button>
+    </div>
+    <span class="note" id="teamStatus" role="status"></span>
+  </section>
   <section class="card" style="width:100%;gap:8px"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:16px">Cópia de segurança · alocações bloqueadas, negócios e vendas</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="stExp">Guardar cópia (ficheiro)</button><label class="btn" for="stIn" style="display:inline-flex;align-items:center">Carregar cópia…</label><input id="stIn" type="file" accept=".json,application/json" hidden></span></div><span class="note" id="stNote">As alocações bloqueadas, os negócios fechados, as vendas marcadas à mão, as datas de saída escritas e as preferências ficam guardadas neste browser. Para os levar para outro browser, outro computador ou a versão online: "Guardar cópia" aqui e "Carregar cópia…" no outro.</span></section>
   <section class="card" style="width:100%"><div class="rowsb"><h2 style="font-size:18px">Negócios fechados</h2><span class="note" id="hDealsNote"></span></div><div id="hDeals"></div></section>
   <div class="cols" style="width:100%">
@@ -1654,7 +1662,8 @@ const SHAREPOINT = {
   drive: 'b!tDspHS-8_06fSneRoEVGiIzQ_wwWK5dJhqGpmrL0k_yVQ7fm29iyQ7jbVXGCuMch',
   path: ['Alexandra Silva', '2026 - Alocação de Animais', 'Alocação_Dashboard_2026_2 dvd.xlsx'],
   controlPath: ['App Alocação Animais', '_controlo'],
-  scope: 'https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.Read',
+  scope: 'https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.Read https://graph.microsoft.com/Lists.SelectedOperations.Selected',
+  teamList: 'https://graph.microsoft.com/v1.0/sites/montedopastopt.sharepoint.com,1d293bb4-bc2f-4eff-9f4a-7791a0454688,0cffd08c-2b16-4997-86a1-a99ab2f493fc/lists/bd079891-a715-41d6-89e1-f8f531f61074/items',
   stateKey: 'mdp-sharepoint-sign-in'
 };
 let sharePointToken = null;
@@ -1672,6 +1681,7 @@ function lockApp(message = '') {
   $('logoutBtn').hidden = true;
 }
 function unlockApp(profile) {
+  $('teamState').hidden = false;
   $('accountName').textContent = profile.userPrincipalName || profile.displayName || 'Conta Monte do Pasto';
   $('accountName').hidden = false;
   $('logoutBtn').hidden = false;
@@ -1736,6 +1746,76 @@ async function finishSharePointSignIn() {
   unlockApp(profile);
   return true;
 }
+const teamKeys = ['mdp-negocios-v1', 'mdp-reservas-v1', 'mdp-vendas-v1', 'mdp-hist-v1', 'mdp-datas-saida-v1'];
+let teamRevision;
+async function teamRequest(path, options = {}) {
+  const response = await fetch(SHAREPOINT.teamList + path, {
+    ...options, cache: 'no-store',
+    headers: { ...options.headers, Authorization: 'Bearer ' + sharePointToken.value }
+  });
+  if (response.status === 401) throw new Error('A sessão Microsoft expirou. Volta a entrar na app.');
+  if (response.status === 403) throw new Error('A conta ou a app ainda não tem acesso à lista de alocações.');
+  if (response.status === 412) throw new Error('A equipa guardou uma versão nova. Guarda uma cópia local antes de carregar a versão partilhada.');
+  if (!response.ok) throw new Error('O SharePoint devolveu o erro ' + response.status + '.');
+  return response.json();
+}
+async function teamRecord() {
+  const record = await teamRequest('/1?$expand=fields');
+  if (record.fields?.Title !== 'Master Allocation') {
+    throw new Error('O registo de alocações da equipa não está configurado.');
+  }
+  const revision = record.eTag || record.fields['@odata.etag'];
+  if (!revision) throw new Error('O SharePoint não devolveu a revisão dos dados.');
+  return { ...record, revision };
+}
+function readTeamData(record) {
+  const data = JSON.parse(record.fields.Dados);
+  if (!Array.isArray(data[teamKeys[0]]) || !Array.isArray(data[teamKeys[1]]) || !Array.isArray(data[teamKeys[3]]) ||
+      ![teamKeys[2], teamKeys[4]].every(key => data[key] && typeof data[key] === 'object' && !Array.isArray(data[key]))) {
+    throw new Error('Os dados da equipa têm um formato inválido.');
+  }
+  return data;
+}
+async function loadTeamState() {
+  const record = await teamRecord();
+  if (!record?.fields?.Dados) return 'Ainda não há alocações guardadas no SharePoint.';
+  const data = readTeamData(record);
+  if (!confirm('Carregar a versão partilhada? As alocações, negócios, vendas e datas deste navegador serão substituídos.')) return 'Carregamento cancelado.';
+  [deals, reservas, VENDAS, HIST, DSAIDA] = teamKeys.map(key => data[key]);
+  teamKeys.forEach(key => store.set(key, data[key]));
+  teamRevision = record.revision;
+  sel = new Set();
+  render();
+  return 'Versão da equipa carregada.';
+}
+async function saveTeamState() {
+  const record = await teamRecord();
+  if (record?.fields?.Dados && record.revision !== teamRevision) {
+    throw new Error('Existe uma versão partilhada mais recente. Guarda uma cópia do teu trabalho antes de a carregar.');
+  }
+  if (!confirm('Guardar as alocações, negócios, vendas e datas atuais como versão partilhada?')) return 'Gravação cancelada.';
+  const data = Object.fromEntries(teamKeys.map((key, index) => [key, [deals, reservas, VENDAS, HIST, DSAIDA][index]]));
+  const fields = { Title: 'Master Allocation', Dados: JSON.stringify(data) };
+  if (fields.Dados.length > 63000) throw new Error('A versão excede o tamanho suportado pela coluna Dados. Guarda uma cópia local.');
+  const saved = await teamRequest('/1/fields', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'If-Match': record.revision },
+    body: JSON.stringify(fields)
+  });
+  teamRevision = saved['@odata.etag'] || saved.eTag;
+  return 'Versão da equipa guardada no SharePoint.';
+}
+function teamAction(action) {
+  return async () => {
+    $('teamLoad').disabled = $('teamSave').disabled = true;
+    $('teamStatus').textContent = 'A consultar o SharePoint…';
+    try { $('teamStatus').textContent = await action(); }
+    catch (e) { $('teamStatus').textContent = e.message; }
+    finally { $('teamLoad').disabled = $('teamSave').disabled = false; }
+  };
+}
+$('teamLoad').onclick = teamAction(loadTeamState);
+$('teamSave').onclick = teamAction(saveTeamState);
 async function sharePointFile(path, allowNested = false) {
   const root = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/root:/';
   const encoded = path.map(encodeURIComponent).join('/');
