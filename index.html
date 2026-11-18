@@ -1626,6 +1626,104 @@ $('refresh').onclick = async () => {
     $('refresh').disabled = false;
   }
 };
+const SHAREPOINT = {
+  origin: 'https://master-allocation.montedopasto.pt',
+  authority: 'https://login.microsoftonline.com/ee417351-ea90-41e0-9147-5ea6ab38ea49/oauth2/v2.0',
+  client: 'f5456ed4-ab81-441a-884f-5ecd0f752016',
+  drive: 'b!tDspHS-8_06fSneRoEVGiIzQ_wwWK5dJhqGpmrL0k_yVQ7fm29iyQ7jbVXGCuMch',
+  path: ['Alexandra Silva', '2026 - Alocação de Animais', 'Alocação_Dashboard_2026_2 dvd.xlsx'],
+  scope: 'https://graph.microsoft.com/Files.Read',
+  stateKey: 'mdp-sharepoint-sign-in'
+};
+let sharePointToken = null;
+const base64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function signInToSharePoint() {
+  if (location.origin !== SHAREPOINT.origin) {
+    throw new Error('Abra master-allocation.montedopasto.pt para ligar ao SharePoint.');
+  }
+  const state = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  sessionStorage.setItem(SHAREPOINT.stateKey, JSON.stringify({ state, verifier, started: Date.now() }));
+  const params = new URLSearchParams({
+    client_id: SHAREPOINT.client, response_type: 'code', response_mode: 'query',
+    redirect_uri: SHAREPOINT.origin + '/', scope: SHAREPOINT.scope,
+    state, code_challenge: base64Url(new Uint8Array(digest)), code_challenge_method: 'S256'
+  });
+  location.assign(SHAREPOINT.authority + '/authorize?' + params);
+}
+async function finishSharePointSignIn() {
+  if (location.origin !== SHAREPOINT.origin) return false;
+  const url = new URL(location.href);
+  const params = url.searchParams;
+  if (!params.has('code') && !params.has('error')) return false;
+  const pending = sessionStorage.getItem(SHAREPOINT.stateKey);
+  const state = params.get('state');
+  const code = params.get('code');
+  const error = params.get('error');
+  for (const key of ['code', 'state', 'error', 'error_description', 'error_uri', 'session_state']) params.delete(key);
+  history.replaceState(history.state, '', url);
+  sessionStorage.removeItem(SHAREPOINT.stateKey);
+  const attempt = pending ? JSON.parse(pending) : null;
+  if (!attempt || attempt.state !== state || Date.now() - attempt.started > 15 * 60 * 1000) {
+    throw new Error('O pedido de início de sessão expirou. Volte a clicar em Atualizar.');
+  }
+  if (error || !code) throw new Error('O Microsoft 365 não autorizou a leitura do SharePoint (' + (error || 'sem código') + ').');
+  const response = await fetch(SHAREPOINT.authority + '/token', {
+    method: 'POST',
+    body: new URLSearchParams({
+      client_id: SHAREPOINT.client, grant_type: 'authorization_code', code,
+      redirect_uri: SHAREPOINT.origin + '/', code_verifier: attempt.verifier, scope: SHAREPOINT.scope
+    })
+  });
+  if (!response.ok) throw new Error('Não foi possível concluir o início de sessão Microsoft.');
+  const token = await response.json();
+  if (!token.access_token) throw new Error('A Microsoft não devolveu acesso ao SharePoint.');
+  sharePointToken = { value: token.access_token, expires: Date.now() + Number(token.expires_in) * 1000 };
+  return true;
+}
+async function refreshSharePoint() {
+  $('refresh').disabled = true;
+  try {
+    setInfo('A consultar o ficheiro de alocação no SharePoint…');
+    if (!sharePointToken || Date.now() >= sharePointToken.expires - 60000) {
+      await signInToSharePoint();
+      return;
+    }
+    const root = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/root:/';
+    const path = SHAREPOINT.path.map(encodeURIComponent).join('/');
+    const select = '?' + new URLSearchParams({ '$select': 'name,lastModifiedDateTime,file,@microsoft.graph.downloadUrl' });
+    const options = { cache: 'no-store', headers: { Authorization: 'Bearer ' + sharePointToken.value } };
+    let response = await fetch(root + encodeURIComponent('documentos partilhados') + '/' + path + select, options);
+    if (response.status === 404) response = await fetch(root + path + select, options);
+    if (response.status === 401) {
+      sharePointToken = null;
+      throw new Error('A sessão Microsoft expirou. Volte a clicar em Atualizar.');
+    }
+    if (response.status === 403) throw new Error('A conta Microsoft não tem acesso de leitura ao ficheiro.');
+    if (response.status === 404) throw new Error('O Excel de alocação não foi encontrado na pasta da Alexandra.');
+    if (!response.ok) throw new Error('O SharePoint devolveu o erro ' + response.status + '.');
+    const item = await response.json();
+    const download = item['@microsoft.graph.downloadUrl'];
+    if (!item.file || !download || new URL(download).protocol !== 'https:') {
+      throw new Error('O SharePoint não disponibilizou o ficheiro Excel.');
+    }
+    const workbook = await fetch(download, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!workbook.ok) throw new Error('Não foi possível descarregar o Excel do SharePoint.');
+    const modified = Date.parse(item.lastModifiedDateTime);
+    await loadFile(new File([await workbook.blob()], item.name, {
+      lastModified: Number.isFinite(modified) ? modified : Date.now()
+    }));
+  } catch (e) {
+    setInfo('Erro ao atualizar do SharePoint: ' + e.message);
+  } finally {
+    $('refresh').disabled = false;
+  }
+}
+if (location.origin === SHAREPOINT.origin) $('refresh').onclick = refreshSharePoint;
+finishSharePointSignIn().then((ready) => {
+  if (ready) return refreshSharePoint();
+}).catch((e) => setInfo('Erro ao ligar ao SharePoint: ' + e.message));
 $('dirIn').onchange = async (e) => {
   const all = Array.from(e.target.files || []).filter((f) => (f.webkitRelativePath || '').split('/').length === 2);
   const f = newest(all);
