@@ -1659,9 +1659,13 @@ const SHAREPOINT = {
   authority: 'https://login.microsoftonline.com/ee417351-ea90-41e0-9147-5ea6ab38ea49/oauth2/v2.0',
   client: 'f5456ed4-ab81-441a-884f-5ecd0f752016',
   drive: 'b!tDspHS-8_06fSneRoEVGiIzQ_wwWK5dJhqGpmrL0k_yVQ7fm29iyQ7jbVXGCuMch',
-  path: ['documentos partilhados', 'Alexandra Silva', '2026 - Alocação de Animais', 'Alocação_Dashboard_2026_2 dvd.xlsx'],
-  controlPath: ['App Alocação Animais', '_controlo'],
-  scope: 'https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.Read https://graph.microsoft.com/Lists.SelectedOperations.Selected',
+  workbookId: '01NEJB4KBWGLB7GHDKMNDZLH6NR4B4UE4R',
+  controlIds: {
+    'analises_marrocos.js': '01NEJB4KALVGWHG7ULRZDZ3ARUZ26E4BO5',
+    'angus_certificados.js': '01NEJB4KGY5OPPKICCF5HYHKHLZPPOZDNS',
+    'origens.js': '01NEJB4KDSLVSDXSHH4BEKY3YZY6E2DKG3'
+  },
+  scope: 'https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.SelectedOperations.Selected https://graph.microsoft.com/Lists.SelectedOperations.Selected',
   teamList: 'https://graph.microsoft.com/v1.0/sites/montedopastopt.sharepoint.com,1d293bb4-bc2f-4eff-9f4a-7791a0454688,0cffd08c-2b16-4997-86a1-a99ab2f493fc/lists/bd079891-a715-41d6-89e1-f8f531f61074/items',
   stateKey: 'mdp-sharepoint-sign-in'
 };
@@ -1815,24 +1819,23 @@ function teamAction(action) {
 }
 $('teamLoad').onclick = teamAction(loadTeamState);
 $('teamSave').onclick = teamAction(saveTeamState);
-async function sharePointFile(path) {
-  const root = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/root:/';
-  const encoded = path.map(encodeURIComponent).join('/');
+async function sharePointFile(id) {
+  const itemUrl = 'https://graph.microsoft.com/v1.0/drives/' + encodeURIComponent(SHAREPOINT.drive) + '/items/' + encodeURIComponent(id);
   const select = '?' + new URLSearchParams({ '$select': 'name,lastModifiedDateTime,file,@microsoft.graph.downloadUrl' });
   const options = { cache: 'no-store', headers: { Authorization: 'Bearer ' + sharePointToken.value } };
-  const response = await fetch(root + encoded + select, options);
+  const response = await fetch(itemUrl + select, options);
   if (!response.ok) throw Object.assign(new Error('O SharePoint devolveu o erro ' + response.status + '.'), { status: response.status });
   const item = await response.json();
   const url = item['@microsoft.graph.downloadUrl'];
-  if (!item.file || !url || new URL(url).protocol !== 'https:') throw new Error('O SharePoint não disponibilizou ' + path.at(-1) + '.');
+  if (!item.file || !url || new URL(url).protocol !== 'https:') throw new Error('O SharePoint não disponibilizou ' + item.name + '.');
   const content = await fetch(url, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
-  if (!content.ok) throw new Error('Não foi possível descarregar ' + path.at(-1) + '.');
+  if (!content.ok) throw new Error('Não foi possível descarregar ' + item.name + '.');
   return { item, content };
 }
 async function refreshSharePointControl() {
   const supplemental = CTL_FILES.filter(([name]) => name !== 'dados_alocacao.js');
   const results = await Promise.allSettled(supplemental.map(async ([name, key]) => {
-    const { content } = await sharePointFile([...SHAREPOINT.controlPath, name]);
+    const { content } = await sharePointFile(SHAREPOINT.controlIds[name]);
     const tx = await content.text();
     const match = tx.match(/^\s*window\.([A-Z_]+)\s*=\s*([\s\S]*?);?\s*$/);
     if (!match || match[1] !== key) throw new Error('Formato de dados inválido.');
@@ -1850,7 +1853,7 @@ async function refreshSharePoint() {
       await signInToSharePoint(true);
       return;
     }
-    const { item, content: workbook } = await sharePointFile(SHAREPOINT.path);
+    const { item, content: workbook } = await sharePointFile(SHAREPOINT.workbookId);
     const missing = await refreshSharePointControl();
     loadAna();
     $('anaInfo').textContent = anaInfoText();
