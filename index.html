@@ -484,7 +484,7 @@ const PREP = 3;
 function prepOf(r) { const tem = r.ids.length; return { col: Math.floor(tem * (1 - PREP / 100)), prep: tem, tem }; }
 function resMap() { const m = {}; reservas.forEach((r) => r.ids.forEach((id) => { (m[id] = m[id] || []).push(r); })); return m; }
 const SALE_SECS = ['Exportação', 'Mercado Nacional – Carne', 'Mercado – Carcaças / Espanha'];
-const SALE_DEF = [[/montalv/i, 'Montalva'], [/carsiva/i, 'Carsiva'], [/pingo\s*doce/i, 'Pingo Doce'], [/domaine/i, 'Domaine (Marrocos)'], [/israel\s*10\s*nov/i, 'Israel 10 Nov']];
+const SALE_DEF = [[/montalv/i, 'Montalva'], [/interm[aá]r?ch/i, 'Intermarché'], [/carsiva/i, 'Carsiva'], [/pingo\s*doce/i, 'Pingo Doce'], [/domaine/i, 'Domaine (Marrocos)'], [/israel\s*10\s*nov/i, 'Israel 10 Nov']];
 let VENDAS = store.get('mdp-vendas-v1', {});
 const DEAL_TAG = ' · negócio na app';
 function dealMap() { const m = {}; deals.forEach((d) => d.ids.forEach((id) => { m[id] = d; })); return m; }
@@ -508,6 +508,14 @@ function gmdFill(rows) {
     else { a.gr = a.m ? 1.3 : 1.0; a.grSrc = 'padrão'; }
   });
   return rows;
+}
+// Alocações que não estão no "Quadro Alocações" (ex.: "Saida Montalva", "Israel 03 Dez sobra"): classificar pelo nome em vez de as pôr em "Outros".
+const SEC_GUESS = [[/israel|marrocos|arg[eé]lia|l[ií]bano|exporta/i, 'Exportação'], [/angus/i, 'Angus'], [/sogenave/i, 'Mercado Nacional – Carne'], [/sa[ií]da|montalv|interm|pingo|carsiva|abate|espanha|nacional|carca/i, 'Mercado – Carcaças / Espanha']];
+function fixQsec(D) {
+  if (!D || !D.rows) return D; const q = D.qsec || (D.qsec = []); const have = new Set(q.map((x) => x[0])); const lc = {}; q.forEach(([n, s]) => { lc[String(n).trim().toLowerCase()] = s; });
+  const add = new Map(); D.qsecGuess = {};
+  D.rows.forEach((a) => { const n = String(a.alloc).trim(); if (have.has(n) || add.has(n) || n === '(sem alocação)') return; let s = lc[n.toLowerCase()]; if (!s) { const g = SEC_GUESS.find(([rx]) => rx.test(n)); if (g) { s = g[1]; D.qsecGuess[n] = s; } } if (s) add.set(n, s); });
+  add.forEach((s, n) => q.push([n, s])); return D;
 }
 function fromSnapshot(C) {
   const src = C.src ? C.src + ' · alterado a ' + new Date(C.mtime).toLocaleString('pt-PT') : 'Dados incluídos na app (ficheiro de alocação de 03-11-2026)';
@@ -932,7 +940,7 @@ function renderPanel() {
       const show = ks.slice(0, 3).map((d) => `<span class="mono">${fmt(d)}</span> <span class="note">(${nf(g.qd[d])}) · apto ${fmt(d + 35).slice(0, 5)}</span>`).join('<br>');
       return `<td style="font-size:13px;white-space:nowrap">${show}${ks.length > 3 ? '<br><span class="note">+ ' + (ks.length - 3) + ' outras datas</span>' : ''}${g.qNo ? '<br><span class="chip c-am">' + nf(g.qNo) + ' sem quarentena</span>' : ''}</td>`; };
     const saleCell = (g, sub) => (!sale ? '' : (sub ? '<td></td>' : `<td><input list="clientList" data-sale="${esc(String(g.name).trim())}" value="${esc(saleOf(g.name))}" placeholder="Por vender" aria-label="Cliente de ${esc(g.name)}" style="width:150px;padding:4px 6px"></td>`));
-    const nameCell = (g, sub) => (sale && !sub && saleOf(g.name) ? `<td><span style="text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;font-weight:600">${esc(g.name)}</span> <span class="chip c-ok">Vendido · ${esc(saleOf(g.name))}</span></td>` : `<td>${esc(g.name)}</td>`);
+    const nameCell = (g, sub) => (sale && !sub && saleOf(g.name) ? `<td><span style="text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;font-weight:600">${esc(g.name)}</span> <span class="chip c-ok">Vendido · ${esc(saleOf(g.name))}</span></td>` : `<td>${esc(g.name)}${DB.qsecGuess && DB.qsecGuess[String(g.name).trim()] ? ' <span class="chip c-am" title="Esta alocação não está no Quadro Alocações do ficheiro da Alexandra; a app classificou-a pelo nome">fora do Quadro</span>' : ''}</td>`);
     const row = (g, sub) => `<tr class="${sub ? 'sub' : ''}" ${sale && !sub && saleOf(g.name) ? 'style="background:#F1F7F3"' : ''}>${nameCell(g, sub)}<td class="num">${nf(g.M)}</td><td class="num">${nf(g.F)}</td><td class="num"><strong>${nf(g.M + g.F)}</strong></td><td class="num">${avg(g.kM) ? nf(avg(g.kM)) + ' kg' : '—'}</td><td class="num">${avg(g.kF) ? nf(avg(g.kF)) + ' kg' : '—'}</td><td class="num">${nf(g.el)}</td><td class="num">${g.old ? '<span class="chip c-am">' + nf(g.old) + '</span>' : '0'}</td>${cCell(g)}${qCell(g)}${anaCell(g)}${saleCell(g, sub)}</tr>`;
     return `<section class="seccard" style="border-top:6px solid ${s.c}"><div class="sh" style="background:${s.bg};color:${s.ink}"><span>${esc(s.k)}</span><span style="font-weight:600">${nf(t.M + t.F)} animais · peso previsto a ${fmt(L)}</span></div>
       <div class="tablewrap"><table><thead><tr><th>Alocação</th><th class="num">Machos</th><th class="num">Fêmeas</th><th class="num">Total</th><th class="num">Peso médio M<br>a ${fmt(L)}</th><th class="num">Peso médio F<br>a ${fmt(L)}</th><th class="num">Cumprem regras · ${esc(m.label)}</th><th class="num">Pesagem &gt; 60 dias</th>${s.k === 'Angus' ? '<th class="num">Angus certificados<br><span style="font-weight:400;text-transform:none">(e-Exploração)</span></th>' : ''}${s.k === 'Exportação' ? '<th>Fecho de quarentena<br><span style="font-weight:400;text-transform:none">(n.º de animais · apto aos 35 dias)</span></th>' : ''}${m.proto ? '<th class="num">Análises 2.ª parte<br>(colhidas até ' + fmt(L - anaWin()) + ')</th>' : ''}${sale ? '<th>Vendido a</th>' : ''}</tr></thead>
@@ -1517,7 +1525,7 @@ async function loadFile(f) {
   await new Promise((r) => setTimeout(r, 30));
   try {
     const buf = await f.arrayBuffer();
-    DB = fromWorkbook(buf, f.name); DB.mtime = f.lastModified;
+    DB = fixQsec(fromWorkbook(buf, f.name)); DB.mtime = f.lastModified;
     setInfo(f.name + ' · alterado a ' + new Date(f.lastModified).toLocaleString('pt-PT') + ' · ' + nf(DB.rows.length) + ' animais');
     sel = new Set(); render();
     return true;
@@ -1559,7 +1567,7 @@ async function readCtl(h, ask) {
 function updateCtlData(loaded) {
   const w = loaded.includes('dados_alocacao.js') ? window.DADOS_ALOCACAO : null;
   if (w && w.rows && (!DB || !DB.mtime || w.mtime > DB.mtime)) {
-    DB = fromSnapshot(w);
+    DB = fixQsec(fromSnapshot(w));
     setInfo(DB.source + ' · ' + nf(DB.rows.length) + ' animais');
   }
   if (DB && DB.rows) gmdFill(DB.rows);
@@ -1918,7 +1926,7 @@ S.tab = 'home';
 if (!loginRequired) {
   loadAna();
   const D0 = (window.DADOS_ALOCACAO && window.DADOS_ALOCACAO.rows && (!SNAPSHOT.mtime || window.DADOS_ALOCACAO.mtime > SNAPSHOT.mtime || (window.DADOS_ALOCACAO.mtime === SNAPSHOT.mtime && String(window.DADOS_ALOCACAO.gerado || '') >= String(SNAPSHOT.gerado || '')))) ? window.DADOS_ALOCACAO : SNAPSHOT;
-  DB = fromSnapshot(D0);
+  DB = fixQsec(fromSnapshot(D0));
   $('srcInfo').textContent = DB.source + ' · ' + nf(DB.rows.length) + ' animais';
   $('anaInfo').textContent = anaInfoText();
   render();
