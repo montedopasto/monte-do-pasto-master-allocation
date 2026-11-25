@@ -232,7 +232,7 @@ if (location.protocol !== 'file:') document.documentElement.classList.add('mdp-l
     <div class="cols">
       <section class="card"><h2 style="font-size:17px">Porque ficaram de fora</h2><span class="note" id="popNote"></span><div id="reasons"></div></section>
       <section class="card"><h2 style="font-size:17px" id="rulesTitle">Regras aplicadas</h2><div id="rules"></div></section>
-      <section class="card" style="flex:2 1 460px"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:17px">Onde estão</h2><span style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn link" id="penAll">Todos os parques</button><button type="button" class="btn link" id="penExp">Exportar quadro (PDF)</button></span></div><span class="note" id="penNote">Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Passe o rato em "Não elegíveis" para ver os motivos.</span><div id="pens" style="max-height:420px;overflow:auto"></div></section>
+      <section class="card" style="flex:2 1 460px"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:17px">Onde estão</h2><span style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn link" id="penAll">Marcar todos</button><button type="button" class="btn link" id="penNone">Desmarcar todos</button><button type="button" class="btn link" id="penExp">Exportar quadro (PDF)</button></span></div><span class="note" id="penNote">Todos os parques estão marcados. Desmarque os que não quer usar no lote.</span><div id="pens" style="max-height:420px;overflow:auto"></div></section>
     </div>
     <section class="card">
       <div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:19px">Animais disponíveis</h2><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button type="button" class="btn" id="expBtn">Exportar (Excel)</button><span class="note" id="expMsg" role="status"></span></div></div>
@@ -473,7 +473,7 @@ function anaInfoText() {
 }
 
 let DB = null;
-const DEF = { marg: '3', mk: 'israel', date: iso(TODAY + 49), sex: 'all', pmin: '', pmax: '', pavg: '', imin: '', imax: '', farms: [], breedsOff: [], scope: 'all', cand: true, n: '', allocOver: {}, pensOn: [] };
+const DEF = { marg: '3', mk: 'israel', date: iso(TODAY + 49), sex: 'all', pmin: '', pmax: '', pavg: '', imin: '', imax: '', farms: [], breedsOff: [], scope: 'all', cand: true, n: '', allocOver: {}, pensOff: [] };
 let S = Object.assign({}, DEF, store.get('mdp-criterios-v1', {}));
 let sel = new Set();
 let deals = store.get('mdp-negocios-v1', []);
@@ -587,7 +587,7 @@ function compute(Lforce, noLot) {
   const imin = num(S.imin), imax = num(S.imax), pavg = num(S.pavg);
   const pmin = num(S.pmin), pmax = num(S.pmax);
   const blocked = {}; deals.forEach((d) => d.ids.forEach((id) => { blocked[id] = d.name; })); const dmC = dealMap(); const rmC = resMap();
-  const ST = {}; let curA = null; const eligIds = new Set(); const pensSel = (S.pensOn || []).length ? new Set(S.pensOn) : null;
+  const ST = {}; let curA = null; const eligIds = new Set(); const pensOffC = new Set(S.pensOff || []);
   const reasons = {}; const bump = (k, n) => { reasons[k] = (reasons[k] || 0) + (n || 1); if (curA && !n) ST[curA.id] = k; };
   const qLimit = L - 35; let pop = 0, outGreen = 0, outSold = 0; const out = [];
   for (const a of DB.rows) {
@@ -624,7 +624,7 @@ function compute(Lforce, noLot) {
     const an = ps ? anaOf(a, L) : null;
     const ePro = !an ? earliest : (an.d ? Math.max(earliest, an.d + anaWin()) : Math.max(earliest, TODAY + anaWin()));
     eligIds.add(a.id);
-    if (pensSel && !pensSel.has(a.g)) { bump('Elegível, mas o parque não está selecionado'); continue; }
+    if (pensOffC.has(a.g)) { bump('Elegível, mas o parque foi desmarcado'); continue; }
     out.push({ a, kg, age, qs, ps, earliest: ePro, an });
   }
   curA = null;
@@ -1318,15 +1318,17 @@ function penStats(R) {
   return P;
 }
 function renderPens(R) {
-  const P = penStats(R); const sel = S.pensOn || [];
-  const arr = Object.values(P).filter((x) => x.el || sel.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  const P = penStats(R); const off = S.pensOff || [];
+  const arr = Object.values(P).filter((x) => x.el || off.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  PEN_LIST = arr.map((x) => x.g);
   const T = arr.reduce((s, x) => { s.tot += x.tot; s.el += x.el; s.lot += x.lot; return s; }, { tot: 0, el: 0, lot: 0 });
-  $('pens').innerHTML = arr.length ? `<table class="pentbl"><thead><tr><th></th><th>Parque</th><th class="num">Total parque</th><th class="num">Elegíveis</th><th class="num">Não eleg.</th><th class="num">No lote</th></tr></thead><tbody>${arr.map((x) => { const on = !sel.length || sel.indexOf(x.g) >= 0; const top = Object.keys(x.why).sort((a, b) => x.why[b] - x.why[a]).slice(0, 3).map((k) => k + ': ' + x.why[k]).join('\n');
-    return `<tr class="${on ? '' : 'off'}"><td><input type="checkbox" data-pen="${esc(x.g)}" ${sel.indexOf(x.g) >= 0 ? 'checked' : ''} aria-label="Usar o parque ${esc(x.g)}"></td><td class="mono">${esc(x.g)}</td><td class="num">${nf(x.tot)}</td><td class="num"><strong>${nf(x.el)}</strong></td><td class="num" title="${esc(top)}">${nf(x.tot - x.el)}</td><td class="num">${x.lot ? '<strong style="color:#247305">' + nf(x.lot) + '</strong>' : '0'}</td></tr>`; }).join('')}</tbody><tfoot><tr><td></td><td><strong>Total</strong></td><td class="num"><strong>${nf(T.tot)}</strong></td><td class="num"><strong>${nf(T.el)}</strong></td><td class="num"><strong>${nf(T.tot - T.el)}</strong></td><td class="num"><strong>${nf(T.lot)}</strong></td></tr></tfoot></table>` : '<span class="note">Nenhum parque com animais elegíveis.</span>';
-  $('penNote').textContent = sel.length ? nf(sel.length) + ' parque' + (sel.length > 1 ? 's' : '') + ' selecionado' + (sel.length > 1 ? 's' : '') + ' · o lote usa só estes.' : 'Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Passe o rato em "Não elegíveis" para ver os motivos.';
+  $('pens').innerHTML = arr.length ? `<table class="pentbl"><thead><tr><th></th><th>Parque</th><th class="num">Total parque</th><th class="num">Elegíveis</th><th class="num">Não eleg.</th><th class="num">No lote</th></tr></thead><tbody>${arr.map((x) => { const on = off.indexOf(x.g) < 0; const top = Object.keys(x.why).sort((a, b) => x.why[b] - x.why[a]).slice(0, 3).map((k) => k + ': ' + x.why[k]).join('\n');
+    return `<tr class="${on ? '' : 'off'}"><td><input type="checkbox" data-pen="${esc(x.g)}" ${on ? 'checked' : ''} aria-label="Usar o parque ${esc(x.g)}"></td><td class="mono">${esc(x.g)}</td><td class="num">${nf(x.tot)}</td><td class="num"><strong>${nf(x.el)}</strong></td><td class="num" title="${esc(top)}">${nf(x.tot - x.el)}</td><td class="num">${x.lot ? '<strong style="color:#247305">' + nf(x.lot) + '</strong>' : '0'}</td></tr>`; }).join('')}</tbody><tfoot><tr><td></td><td><strong>Total</strong></td><td class="num"><strong>${nf(T.tot)}</strong></td><td class="num"><strong>${nf(T.el)}</strong></td><td class="num"><strong>${nf(T.tot - T.el)}</strong></td><td class="num"><strong>${nf(T.lot)}</strong></td></tr></tfoot></table>` : '<span class="note">Nenhum parque com animais elegíveis.</span>';
+  const nOff = arr.filter((x) => off.indexOf(x.g) >= 0).length;
+  $('penNote').textContent = nOff ? nf(arr.length - nOff) + ' de ' + nf(arr.length) + ' parques marcados · ' + nf(nOff) + ' desmarcado' + (nOff > 1 ? 's' : '') + ' (fora do lote).' : 'Todos os parques estão marcados. Desmarque os que não quer usar no lote. Passe o rato em "Não eleg." para ver os motivos.';
 }
 function exportPens() {
-  const R = LAST_R; if (!R) return; const P = penStats(R); const lot = new Set(R.out.map((o) => o.a.id)); const sel = S.pensOn || [];
+  const R = LAST_R; if (!R) return; const P = penStats(R); const lot = new Set(R.out.map((o) => o.a.id)); const sel = [];
   const rows = Object.values(P).sort((x, y) => (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
   const whyK = {}; rows.forEach((x) => Object.keys(x.why).forEach((k) => { whyK[k] = (whyK[k] || 0) + x.why[k]; }));
   const wk = Object.keys(whyK).sort((x, y) => whyK[y] - whyK[x]);
@@ -1343,16 +1345,18 @@ function exportPens() {
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Parques'); XLSX.utils.book_append_sheet(wb, ws2, 'Animais');
   XLSX.writeFile(wb, 'Parques_' + String(R.m.label).replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_') + '_' + fmt(L) + '.xlsx');
 }
-document.addEventListener('change', (e) => { const t = e.target; if (t && t.dataset && t.dataset.pen !== undefined && t.closest('#pens')) { const g = t.dataset.pen; const s = (S.pensOn || []).slice(); const i = s.indexOf(g); if (t.checked && i < 0) s.push(g); if (!t.checked && i >= 0) s.splice(i, 1); S.pensOn = s; render(); } });
-$('penAll').onclick = () => { S.pensOn = []; render(); };
+document.addEventListener('change', (e) => { const t = e.target; if (t && t.dataset && t.dataset.pen !== undefined && t.closest('#pens')) { const g = t.dataset.pen; const s = (S.pensOff || []).slice(); const i = s.indexOf(g); if (!t.checked && i < 0) s.push(g); if (t.checked && i >= 0) s.splice(i, 1); S.pensOff = s; render(); } });
+let PEN_LIST = [];
+$('penAll').onclick = () => { S.pensOff = []; render(); };
+$('penNone').onclick = () => { S.pensOff = PEN_LIST.slice(); render(); };
 function exportPensPdf() {
-  const R = LAST_R; if (!R) return; const P = penStats(R); const sel = S.pensOn || [];
-  const arr = Object.values(P).filter((x) => x.el || sel.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  const R = LAST_R; if (!R) return; const P = penStats(R); const off = S.pensOff || [];
+  const arr = Object.values(P).filter((x) => x.el || off.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
   const T = arr.reduce((s, x) => { s.tot += x.tot; s.el += x.el; s.lot += x.lot; return s; }, { tot: 0, el: 0, lot: 0 });
   const nLot = R.out.length; const nM = R.out.filter((o) => o.a.m).length; const ks = R.out.map((o) => o.kg).filter((x) => x); const av = ks.length ? Math.round(ks.reduce((s, x) => s + x, 0) / ks.length) : 0;
   const title = 'Parques_' + String(R.m.label).replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_') + '_' + fmt(R.L);
   const logo = (document.querySelector('.hbrand img') || {}).src || '';
-  const rows = arr.map((x) => { const on = !sel.length || sel.indexOf(x.g) >= 0; return `<tr class="${on ? '' : 'off'}"><td class="c">${sel.indexOf(x.g) >= 0 ? '☑' : '☐'}</td><td class="mono">${esc(x.g)}</td><td>${esc(Array.from(x.farms).join(', '))}</td><td class="n">${nf(x.tot)}</td><td class="n"><b>${nf(x.el)}</b></td><td class="n">${nf(x.tot - x.el)}</td><td class="n">${x.lot ? '<b class="g">' + nf(x.lot) + '</b>' : '0'}</td></tr>`; }).join('');
+  const rows = arr.map((x) => { const on = off.indexOf(x.g) < 0; return `<tr class="${on ? '' : 'off'}"><td class="c">${on ? '☑' : '☐'}</td><td class="mono">${esc(x.g)}</td><td>${esc(Array.from(x.farms).join(', '))}</td><td class="n">${nf(x.tot)}</td><td class="n"><b>${nf(x.el)}</b></td><td class="n">${nf(x.tot - x.el)}</td><td class="n">${x.lot ? '<b class="g">' + nf(x.lot) + '</b>' : '0'}</td></tr>`; }).join('');
   const html = `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
   @page{size:A4;margin:14mm}body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1F2A24;font-size:11px;margin:0}
   .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #4A0E0E;padding-bottom:8px;margin-bottom:10px}.h img{height:38px}
@@ -1363,10 +1367,10 @@ function exportPensPdf() {
   tfoot td{border-top:2px solid #4A0E0E;font-weight:700;border-bottom:0}thead{display:table-header-group}tr{page-break-inside:avoid}
   .f{margin-top:8px;color:#5C6660;font-size:9.5px}</style></head><body>
   <div class="h"><div><h1>Onde estão · parques</h1><p class="sub">${esc(R.m.label)} · saída ${fmt(R.L)} · gerado a ${fmt(TODAY)}</p></div>${logo ? `<img src="${logo}" alt="Monte do Pasto">` : ''}</div>
-  <div class="k"><span>Lote: <b>${nf(nLot)}</b> animais (${nf(nM)} M · ${nf(nLot - nM)} F)</span><span>Peso médio previsto: <b>${av ? nf(av) + ' kg' : '—'}</b></span><span>Parques: <b>${sel.length ? nf(sel.length) + ' selecionados' : 'todos'}</b></span><span>Fonte: ${esc(DB.source)}</span></div>
+  <div class="k"><span>Lote: <b>${nf(nLot)}</b> animais (${nf(nM)} M · ${nf(nLot - nM)} F)</span><span>Peso médio previsto: <b>${av ? nf(av) + ' kg' : '—'}</b></span><span>Parques: <b>${arr.filter((x) => off.indexOf(x.g) >= 0).length ? nf(arr.filter((x) => off.indexOf(x.g) < 0).length) + ' de ' + nf(arr.length) + ' marcados' : 'todos marcados'}</b></span><span>Fonte: ${esc(DB.source)}</span></div>
   <table><thead><tr><th></th><th>Parque</th><th>Exploração</th><th class="n">Total parque</th><th class="n">Elegíveis</th><th class="n">Não elegíveis</th><th class="n">No lote</th></tr></thead><tbody>${rows}</tbody>
   <tfoot><tr><td></td><td>Total</td><td></td><td class="n">${nf(T.tot)}</td><td class="n">${nf(T.el)}</td><td class="n">${nf(T.tot - T.el)}</td><td class="n">${nf(T.lot)}</td></tr></tfoot></table>
-  <p class="f">☑ parque selecionado para o lote. Elegíveis: cumprem as regras de ${esc(R.m.label)} e os critérios do Simulador nesta data. Monte do Pasto · Master Allocation.</p></body></html>`;
+  <p class="f">☑ parque marcado para o lote; ☐ desmarcado. Elegíveis: cumprem as regras de ${esc(R.m.label)} e os critérios do Simulador nesta data. Monte do Pasto · Master Allocation.</p></body></html>`;
   let fr = document.getElementById('pdfFrame'); if (fr) fr.remove();
   fr = document.createElement('iframe'); fr.id = 'pdfFrame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
   const d = fr.contentWindow.document; d.open(); d.write(html); d.close();
@@ -1383,7 +1387,7 @@ function mkKeyFor(label, name, sec) {
 }
 function eligFor(mk, L) {
   const sv = S, gr = DB.green; const dm = dealMap(); const ao = {}; DB.rows.forEach((a) => { ao[effAlloc(a, dm)] = true; ao[String(a.alloc).trim()] = true; });
-  S = Object.assign({}, DEF, { mk, date: iso(L), allocOver: ao, cand: sv.cand, vacFut: sv.vacFut, onlyProto: sv.onlyProto, anaWin: sv.anaWin, exclRes: false, pensOn: [] }); DB.green = null;
+  S = Object.assign({}, DEF, { mk, date: iso(L), allocOver: ao, cand: sv.cand, vacFut: sv.vacFut, onlyProto: sv.onlyProto, anaWin: sv.anaWin, exclRes: false, pensOff: [] }); DB.green = null;
   try { return compute(L, true); } finally { S = sv; DB.green = gr; }
 }
 function alocPensPdf(k) {
