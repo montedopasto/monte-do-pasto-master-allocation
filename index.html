@@ -803,13 +803,13 @@ function renderAloc() {
   const head = (porto) => `<thead><tr><th>Alocação</th><th class="num ac-m">Machos</th><th class="num ac-f">Fêmeas</th><th class="num ac-tot">Animais disponíveis</th><th class="num ac-col" style="background:#F6EEEC">A colocar<br><span style="font-weight:400;text-transform:none">(disponíveis −${PREP}%)</span></th><th class="ac-pont">Pontuação genética</th><th class="ac-data">Data de saída</th><th class="num ac-pm">Peso médio M</th><th class="num ac-pf">Peso médio F</th><th class="num ac-pmed">Peso médio</th>${porto ? '<th class="num ac-porto" style="background:#F1F7EC">Peso previsto porto<br><span style="font-weight:400;text-transform:none">(−2% desconto barriga)</span></th>' : ''}<th class="num ac-mm">Mín. – máx.</th></tr></thead>`;
   const row = (o) => {
     const { label, arr, d, typed, key, porto, extra } = o; const L = d || TODAY;
-    const lk = 'L' + Object.keys(ALISTS).length; ALISTS[lk] = { name: o.name, arr, d: L, porto: !!porto, sec: o.sec };
+    const lk = 'L' + Object.keys(ALISTS).length; ALISTS[lk] = { name: o.name, arr, d: L, porto: !!porto, sec: o.sec, mk: o.mk || '' };
     const M = arr.filter((a) => a.m), F = arr.filter((a) => !a.m);
     const kM = M.map((a) => kgAt(a, L)).filter((x) => x), kF = F.map((a) => kgAt(a, L)).filter((x) => x), kA = kM.concat(kF);
     const pc = {}; arr.forEach((a) => { pc[a.pont || 0] = (pc[a.pont || 0] || 0) + 1; }); const pts = Object.keys(pc).map(Number).sort((x, y) => pc[y] - pc[x]);
     const aA = avg(kA);
     ALOC_ROWS.push({ sec: o.sec, n: o.name, sold: o.sold || '', d, M: M.length, F: F.length, col: colocar(arr.length), aM: avg(kM), aF: avg(kF), aA, porto: porto && aA ? Math.round(aA * 0.98) : '', min: kA.length ? Math.min(...kA) : null, max: kA.length ? Math.max(...kA) : null, pts: pts.map((k) => (k ? k + ' ' + PONT[k] : PONT[0]) + ': ' + pc[k]).join(' · ') });
-    return `<tr><td>${label}<div style="margin-top:4px"><button type="button" class="btn link" data-alist="${lk}" title="Descarregar a lista dos animais desta alocação">Listagem dos ${nf(arr.length)} animais (Excel)</button></div></td><td class="num ac-m">${nf(M.length)}</td><td class="num ac-f">${nf(F.length)}</td><td class="num ac-tot"><strong>${nf(arr.length)}</strong></td><td class="num ac-col" style="background:#F6EEEC"><strong>${nf(colocar(arr.length))}</strong><div class="note">−${nf(arr.length - colocar(arr.length))} margem</div></td>
+    return `<tr><td>${label}<div style="margin-top:4px"><button type="button" class="btn link" data-alist="${lk}" title="Descarregar a lista dos animais desta alocação">Listagem dos ${nf(arr.length)} animais (Excel)</button><button type="button" class="btn link" data-apdf="${lk}" title="Quadro dos parques desta alocação: total do parque, elegíveis, não elegíveis e animais na alocação">Parques (PDF)</button></div></td><td class="num ac-m">${nf(M.length)}</td><td class="num ac-f">${nf(F.length)}</td><td class="num ac-tot"><strong>${nf(arr.length)}</strong></td><td class="num ac-col" style="background:#F6EEEC"><strong>${nf(colocar(arr.length))}</strong><div class="note">−${nf(arr.length - colocar(arr.length))} margem</div></td>
       <td class="ac-pont" style="font-size:12px">${pts.map((k) => `<span class="chip c-na" title="${esc(pontLbl(k))}" style="margin:1px">${k ? k + ' ' + esc(PONT[k]) : esc(PONT[0])} · ${nf(pc[k])}</span>`).join(' ')}</td>
       <td class="ac-data"><input type="date" data-adate="${esc(key)}" value="${d ? iso(d) : ''}" aria-label="Data de saída de ${esc(o.name)}" style="padding:4px 6px;${typed ? 'border-color:var(--brand);font-weight:600' : ''}"><div class="note">${d ? (d - TODAY) + ' dias' + (typed ? '' : extra || '') : 'sem data · peso de hoje'}</div></td>
       <td class="num ac-pm">${avg(kM) ? nf(avg(kM)) + ' kg' : '—'}</td><td class="num ac-pf">${avg(kF) ? nf(avg(kF)) + ' kg' : '—'}</td><td class="num ac-pmed"><strong>${aA ? nf(aA) + ' kg' : '—'}</strong></td>
@@ -821,7 +821,7 @@ function renderAloc() {
     const byId = {}; DB.rows.forEach((a) => { byId[a.id] = a; });
     const rows = reservas.map((r) => { const key = 'R:' + r.id; const typed = Object.prototype.hasOwnProperty.call(DSAIDA, key); const d = typed ? (DSAIDA[key] ? dayOfCell(DSAIDA[key]) : null) : (dayOfCell(r.date) > 0 ? dayOfCell(r.date) : null);
       const nat = /nacional|espanha/i.test(r.mk);
-      return row({ sec: 'Alocações bloqueadas', name: r.name + ' (bloqueada)', key, typed, d, arr: r.ids.map((id) => byId[id]).filter(Boolean), porto: !nat,
+      return row({ sec: 'Alocações bloqueadas', mk: r.mk, name: r.name + ' (bloqueada)', key, typed, d, arr: r.ids.map((id) => byId[id]).filter(Boolean), porto: !nat,
         label: `<strong>${esc(r.name)}</strong> <span class="chip c-am">Bloqueada</span><div class="note">${esc(r.mk)}</div><span style="display:flex;gap:4px;margin-top:4px"><button type="button" class="btn link" data-resconf="${r.id}">Confirmar venda</button><button type="button" class="btn link" data-resdel="${r.id}">Desbloquear</button></span>` }); }).join('');
     RB = `<section class="seccard" style="border-top:6px solid #4A0E0E"><div class="sh" style="background:#F3E6E4;color:#4A0E0E"><span>Alocações bloqueadas (não vendidas)</span><span style="font-weight:600">${nf(reservas.length)} alocações · os animais continuam também na alocação do ficheiro</span></div>
       <div class="tablewrap"><table style="min-width:1100px">${head(true)}<tbody>${rows}</tbody></table></div></section>`;
@@ -1374,6 +1374,47 @@ function exportPensPdf() {
   setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(() => { document.title = old; }, 1000); } }, 400);
 }
 $('penExp').onclick = () => exportPensPdf();
+// ---------- quadro de parques (PDF) por alocação ----------
+function mkKeyFor(label, name, sec) {
+  const k = Object.keys(MK).find((x) => MK[x].label === label); if (k) return k;
+  const s = String(name || '') + ' ' + String(label || '');
+  if (/israel/i.test(s)) return 'israel'; if (/marrocos|domaine/i.test(s)) return 'marrocos'; if (/arg[eé]lia/i.test(s)) return 'argeliaE'; if (/l[ií]bano/i.test(s)) return 'libano';
+  return sec === 'Exportação' ? 'israel' : 'nacional';
+}
+function eligFor(mk, L) {
+  const sv = S, gr = DB.green; const dm = dealMap(); const ao = {}; DB.rows.forEach((a) => { ao[effAlloc(a, dm)] = true; ao[String(a.alloc).trim()] = true; });
+  S = Object.assign({}, DEF, { mk, date: iso(L), allocOver: ao, cand: sv.cand, vacFut: sv.vacFut, onlyProto: sv.onlyProto, anaWin: sv.anaWin, exclRes: false, pensOn: [] }); DB.green = null;
+  try { return compute(L, true); } finally { S = sv; DB.green = gr; }
+}
+function alocPensPdf(k) {
+  const x = ALISTS[k]; if (!x) return; const L = x.d; const mk = mkKeyFor(x.mk, x.name, x.sec); const R = eligFor(mk, L);
+  const inA = new Set(x.arr.map((a) => a.id)); const P = {};
+  DB.rows.forEach((a) => { const g = a.g || '?'; const s = P[g] || (P[g] = { g, farms: new Set(), tot: 0, el: 0, inA: 0, inM: 0, kg: [] }); s.farms.add(a.farm); s.tot++; if (R.eligIds.has(a.id)) s.el++; if (inA.has(a.id)) { s.inA++; if (a.m) s.inM++; const w = kgAt(a, L); if (w) s.kg.push(w); } });
+  const arr = Object.values(P).filter((s) => s.inA).sort((a, b) => (b.inA - a.inA) || a.g.localeCompare(b.g, 'pt', { numeric: true }));
+  const T = arr.reduce((s, r) => { s.tot += r.tot; s.el += r.el; s.inA += r.inA; s.inM += r.inM; s.kg = s.kg.concat(r.kg); return s; }, { tot: 0, el: 0, inA: 0, inM: 0, kg: [] });
+  const avg = (v) => (v.length ? Math.round(v.reduce((s, y) => s + y, 0) / v.length) : 0); const name = String(x.name).replace(/ \(bloqueada\)$/, '');
+  const title = 'Parques_' + name.replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_').slice(0, 60) + '_' + fmt(L);
+  const logo = (document.querySelector('.hbrand img') || {}).src || '';
+  const rows = arr.map((r) => `<tr><td class="mono">${esc(r.g)}</td><td>${esc(Array.from(r.farms).join(', '))}</td><td class="n">${nf(r.tot)}</td><td class="n"><b>${nf(r.el)}</b></td><td class="n">${nf(r.tot - r.el)}</td><td class="n"><b class="g">${nf(r.inA)}</b></td><td class="n">${nf(r.inM)} / ${nf(r.inA - r.inM)}</td><td class="n">${avg(r.kg) ? nf(avg(r.kg)) : '—'}</td>${x.porto ? `<td class="n">${avg(r.kg) ? nf(Math.round(avg(r.kg) * 0.98)) : '—'}</td>` : ''}</tr>`).join('');
+  const html = `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  @page{size:A4;margin:14mm}body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1F2A24;font-size:11px;margin:0}
+  .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #4A0E0E;padding-bottom:8px;margin-bottom:10px}.h img{height:38px}
+  h1{font-size:17px;color:#4A0E0E;margin:0}.sub{color:#5C6660;margin:3px 0 0}
+  .k{display:flex;gap:18px;flex-wrap:wrap;background:#F4F1EC;border-radius:6px;padding:8px 10px;margin-bottom:10px}.k b{font-size:13px}
+  table{width:100%;border-collapse:collapse}th{text-align:left;font-size:10px;color:#5C6660;border-bottom:1.5px solid #CFC8BC;padding:5px 6px}th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+  td{padding:4px 6px;border-bottom:1px solid #ECE7DF}.mono{font-family:Consolas,monospace}.g{color:#247305}
+  tfoot td{border-top:2px solid #4A0E0E;font-weight:700;border-bottom:0}thead{display:table-header-group}tr{page-break-inside:avoid}.f{margin-top:8px;color:#5C6660;font-size:9.5px}</style></head><body>
+  <div class="h"><div><h1>${esc(name)} · parques</h1><p class="sub">${esc(MK[mk].label)} · saída ${fmt(L)} · gerado a ${fmt(TODAY)}</p></div>${logo ? `<img src="${logo}" alt="Monte do Pasto">` : ''}</div>
+  <div class="k"><span>Na alocação: <b>${nf(T.inA)}</b> animais (${nf(T.inM)} M · ${nf(T.inA - T.inM)} F)</span><span>Peso médio previsto: <b>${avg(T.kg) ? nf(avg(T.kg)) + ' kg' : '—'}</b>${x.porto && avg(T.kg) ? ' · porto −2%: <b>' + nf(Math.round(avg(T.kg) * 0.98)) + ' kg</b>' : ''}</span><span>Parques: <b>${nf(arr.length)}</b></span><span>Fonte: ${esc(DB.source)}</span></div>
+  <table><thead><tr><th>Parque</th><th>Exploração</th><th class="n">Total parque</th><th class="n">Elegíveis</th><th class="n">Não elegíveis</th><th class="n">Na alocação</th><th class="n">M / F</th><th class="n">Peso médio previsto (kg)</th>${x.porto ? '<th class="n">Porto −2% (kg)</th>' : ''}</tr></thead><tbody>${rows}</tbody>
+  <tfoot><tr><td>Total</td><td></td><td class="n">${nf(T.tot)}</td><td class="n">${nf(T.el)}</td><td class="n">${nf(T.tot - T.el)}</td><td class="n">${nf(T.inA)}</td><td class="n">${nf(T.inM)} / ${nf(T.inA - T.inM)}</td><td class="n">${avg(T.kg) ? nf(avg(T.kg)) : '—'}</td>${x.porto ? `<td class="n">${avg(T.kg) ? nf(Math.round(avg(T.kg) * 0.98)) : '—'}</td>` : ''}</tr></tfoot></table>
+  <p class="f">Elegíveis: animais do parque que cumprem as regras de ${esc(MK[mk].label)} na data de saída ${fmt(L)} (quarentena, vacinação, idade, etiquetas), seja qual for a alocação. Monte do Pasto · Master Allocation.</p></body></html>`;
+  let fr = document.getElementById('pdfFrame'); if (fr) fr.remove();
+  fr = document.createElement('iframe'); fr.id = 'pdfFrame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
+  const d = fr.contentWindow.document; d.open(); d.write(html); d.close();
+  const old = document.title; document.title = title;
+  setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(() => { document.title = old; }, 1000); } }, 400);
+}
 function download(name, text) {
   const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
@@ -1417,7 +1458,7 @@ function alocListCSV(k) {
       .concat([a.q >= 0 ? fmt(a.q) : '', a.q >= 0 ? fmt(a.q + 35) : '', a.cert ? 'Sim' : 'Não', a.alloc, [dm[a.id] ? 'Vendido: ' + dm[a.id].name : ''].concat((rm[a.id] || []).map((r) => 'Bloqueada: ' + r.name)).filter(Boolean).join(' | ')]).map(q).join(';'); });
   download('Listagem_' + String(x.name).replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_').slice(0, 60) + '_' + fmt(L) + '.csv', [head.map(q).join(';')].concat(rows).join('\r\n'));
 }
-$('aSections').addEventListener('click', (e) => { const b = e.target.closest('button[data-alist]'); if (b) alocListCSV(b.dataset.alist); });
+$('aSections').addEventListener('click', (e) => { const b = e.target.closest('button[data-alist]'); if (b) alocListCSV(b.dataset.alist); const c = e.target.closest('button[data-apdf]'); if (c) alocPensPdf(c.dataset.apdf); });
 $('aColChips').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const k = b.dataset.acol; AHIDE = AHIDE.indexOf(k) >= 0 ? AHIDE.filter((x) => x !== k) : AHIDE.concat([k]); store.set('mdp-aloc-ocultas-v1', AHIDE); aColStyle(); });
 $('aClear').onclick = () => { DSAIDA = {}; store.set('mdp-datas-saida-v1', DSAIDA); renderAloc(); };
 $('aExp').onclick = () => { const lines = ['Secção;Alocação;Vendido a;Machos;Fêmeas;Animais disponíveis;A colocar (−3%);Pontuação genética;Data de saída;Peso médio machos (kg);Peso médio fêmeas (kg);Peso médio (kg);Peso previsto porto −2% (kg);Peso mínimo (kg);Peso máximo (kg)']; ALOC_ROWS.forEach((r) => lines.push([r.sec, r.n, r.sold || '', r.M, r.F, r.M + r.F, r.col, r.pts, r.d ? fmt(r.d) : 'Hoje (' + fmt(TODAY) + ')', r.aM || '', r.aF || '', r.aA || '', r.porto, r.min || '', r.max || ''].map(q).join(';'))); download('Alocacoes_' + fmt(TODAY) + '.csv', lines.join('\r\n')); };
