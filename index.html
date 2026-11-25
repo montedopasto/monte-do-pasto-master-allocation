@@ -64,7 +64,8 @@ main{max-width:1400px;margin:0 auto;padding:24px;display:flex;flex-wrap:wrap;gap
 .cols>.card{flex:1 1 280px}
 .reason{display:grid;grid-template-columns:1fr 64px;gap:10px;padding:6px 0;border-bottom:1px solid var(--line2)}
 .reason span:last-child{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
-.pen{display:grid;grid-template-columns:110px 1fr 48px;gap:10px;align-items:center;font-size:13px}
+.pen{display:grid;grid-template-columns:22px 110px 1fr 78px;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.pen input{width:16px;height:16px;margin:0;accent-color:#247305;min-height:0}.pen.off{opacity:.55}
 .bar{height:8px;background:var(--line2);border-radius:4px;overflow:hidden}.bar>div{height:8px;background:#5B8A71}
 .mono{font-family:'JetBrains Mono',Consolas,monospace;font-size:13px}
 .remind{background:#FEF8EE;border:1px solid #F0D9AE;border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
@@ -230,7 +231,7 @@ if (location.protocol !== 'file:') document.documentElement.classList.add('mdp-l
     <div class="cols">
       <section class="card"><h2 style="font-size:17px">Porque ficaram de fora</h2><span class="note" id="popNote"></span><div id="reasons"></div></section>
       <section class="card"><h2 style="font-size:17px" id="rulesTitle">Regras aplicadas</h2><div id="rules"></div></section>
-      <section class="card"><h2 style="font-size:17px">Onde estão</h2><div id="pens" style="display:flex;flex-direction:column;gap:8px"></div></section>
+      <section class="card"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:17px">Onde estão</h2><span style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn link" id="penAll">Todos os parques</button><button type="button" class="btn link" id="penExp">Exportar parques (Excel)</button></span></div><span class="note" id="penNote">Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Número: animais no lote / elegíveis no parque.</span><div id="pens" style="display:flex;flex-direction:column;gap:6px;max-height:380px;overflow:auto"></div></section>
     </div>
     <section class="card">
       <div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:19px">Animais disponíveis</h2><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button type="button" class="btn" id="expBtn">Exportar (Excel)</button><span class="note" id="expMsg" role="status"></span></div></div>
@@ -471,7 +472,7 @@ function anaInfoText() {
 }
 
 let DB = null;
-const DEF = { marg: '3', mk: 'israel', date: iso(TODAY + 49), sex: 'all', pmin: '', pmax: '', pavg: '', imin: '', imax: '', farms: [], breedsOff: [], scope: 'all', cand: true, n: '', allocOver: {} };
+const DEF = { marg: '3', mk: 'israel', date: iso(TODAY + 49), sex: 'all', pmin: '', pmax: '', pavg: '', imin: '', imax: '', farms: [], breedsOff: [], scope: 'all', cand: true, n: '', allocOver: {}, pensOn: [] };
 let S = Object.assign({}, DEF, store.get('mdp-criterios-v1', {}));
 let sel = new Set();
 let deals = store.get('mdp-negocios-v1', []);
@@ -585,9 +586,11 @@ function compute(Lforce, noLot) {
   const imin = num(S.imin), imax = num(S.imax), pavg = num(S.pavg);
   const pmin = num(S.pmin), pmax = num(S.pmax);
   const blocked = {}; deals.forEach((d) => d.ids.forEach((id) => { blocked[id] = d.name; })); const dmC = dealMap(); const rmC = resMap();
-  const reasons = {}; const bump = (k, n) => { reasons[k] = (reasons[k] || 0) + (n || 1); };
+  const ST = {}; let curA = null; const eligIds = new Set(); const pensSel = (S.pensOn || []).length ? new Set(S.pensOn) : null;
+  const reasons = {}; const bump = (k, n) => { reasons[k] = (reasons[k] || 0) + (n || 1); if (curA && !n) ST[curA.id] = k; };
   const qLimit = L - 35; let pop = 0, outGreen = 0, outSold = 0; const out = [];
   for (const a of DB.rows) {
+    curA = a;
     const age = months(a.b, L);
     const kg = a.w > 0 && a.wd > 0 ? Math.round(a.w + a.gr * Math.max(0, L - a.wd)) : null;
     if (S.sex === 'M' && a.m !== 1) continue;
@@ -596,7 +599,7 @@ function compute(Lforce, noLot) {
     if (S.breedsOff.indexOf(a.breed) >= 0) continue;
     if ((S.pontOff || []).indexOf(a.pont || 0) >= 0) continue;
     const ea = effAlloc(a, dmC);
-    if (!allocAllowed(ea)) { if (isSoldAlloc(ea)) outSold++; else if (greenMode() && !inGreen(ea)) outGreen++; continue; }
+    if (!allocAllowed(ea)) { if (isSoldAlloc(ea)) { outSold++; ST[a.id] = 'Alocação já vendida'; } else if (greenMode() && !inGreen(ea)) { outGreen++; ST[a.id] = 'Fora da zona verde do Quadro Alocações'; } else ST[a.id] = 'Alocação desmarcada nos critérios'; continue; }
     if (pmin !== null && (kg === null || kg < pmin)) continue;
     if (pmax !== null && (kg === null || kg > pmax)) continue;
     if (imin !== null && age < imin) continue;
@@ -619,8 +622,11 @@ function compute(Lforce, noLot) {
     const earliest = Math.max(TODAY, m.exp ? (a.q >= 0 ? a.q : TODAY) + 35 : TODAY, m.fco ? vFco(a) + m.fco : TODAY, m.ehd ? vDhe(a) + m.ehd : TODAY);
     const an = ps ? anaOf(a, L) : null;
     const ePro = !an ? earliest : (an.d ? Math.max(earliest, an.d + anaWin()) : Math.max(earliest, TODAY + anaWin()));
+    eligIds.add(a.id);
+    if (pensSel && !pensSel.has(a.g)) { bump('Elegível, mas o parque não está selecionado'); continue; }
     out.push({ a, kg, age, qs, ps, earliest: ePro, an });
   }
+  curA = null;
   let balNote = ''; let lotRank = null;
   const nLot = noLot ? 0 : num(S.n); let spareN = 0;
   if (noLot) { /* plano por peso: sem lote */ } else if (nLot && nLot > 0) {
@@ -643,7 +649,7 @@ function compute(Lforce, noLot) {
   }
   if (lotRank) out.sort((x, y) => (lotRank[x.a.g] - lotRank[y.a.g]) || ((y.kg || 0) - (x.kg || 0))); else out.sort((x, y) => (y.kg || 0) - (x.kg || 0));
   if (lotRank && pavg && out.length) { const k = out.filter((o) => o.kg); const av = k.reduce((s, o) => s + o.kg, 0) / k.length; if (Math.abs(av - pavg) > 1.5) balNote = 'Média possível mais próxima: ' + nf(Math.round(av)) + ' kg (pedido ' + nf(pavg) + ' kg).'; }
-  return { m, L, out, reasons, pop, qLimit, pavg, balNote, outGreen, outSold, spareN, nLot };
+  return { m, L, out, reasons, pop, qLimit, pavg, balNote, outGreen, outSold, spareN, nLot, ST, eligIds };
 }
 
 const SECS = [
@@ -1010,8 +1016,7 @@ function render() {
   $('reasons').innerHTML = Object.keys(reasons).sort((x, y) => reasons[y] - reasons[x]).map((k) => `<div class="reason"><span>${esc(k)}</span><span>${nf(reasons[k])}</span></div>`).join('') || '<span class="note">Nenhum.</span>';
   $('rulesTitle').textContent = 'Regras aplicadas · ' + m.label;
   $('rules').innerHTML = (m.exp ? m.rules.concat(['Só animais das alocações da zona verde do Quadro Alocações (sem Entradas)', 'Sem alocação a Mercado Nacional ou Espanha']) : m.rules).map((r) => `<div style="display:flex;gap:8px;padding:3px 0"><span style="color:#247305;font-weight:700">✓</span><span>${esc(r)}</span></div>`).join('');
-  const pa = Object.keys(pens).map((g) => [g, pens[g]]).sort((x, y) => y[1] - x[1]).slice(0, 8); const mx = pa.length ? pa[0][1] : 1;
-  $('pens').innerHTML = pa.map(([g, c]) => `<div class="pen"><span class="mono">${esc(g)}</span><div class="bar"><div style="width:${Math.round(100 * c / mx)}%"></div></div><span style="text-align:right">${nf(c)}</span></div>`).join('') || '<span class="note">—</span>';
+  LAST_R = R; renderPens(R, pens);
   RM_LIST = resMap();
   const show = out.slice(0, 200);
   $('tbody').innerHTML = show.map((o) => `<tr>
@@ -1299,6 +1304,46 @@ $('efeMain').addEventListener('click', (e) => {
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = vis.map((c) => ({ wch: Math.min(40, Math.max(10, c[1].length + 2)) })); ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: out.length, c: vis.length - 1 } }) };
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Efetivo'); XLSX.writeFile(wb, 'Efetivo_' + fmt(TODAY) + (out.length < DB.rows.length ? '_filtrado' : '') + '.xlsx'); }
 });
+// ---------- parques: seleção e exportação ----------
+let LAST_R = null;
+function penStats(R) {
+  const lot = new Set(R.out.map((o) => o.a.id)); const P = {};
+  DB.rows.forEach((a) => {
+    const g = a.g || '?'; const x = P[g] || (P[g] = { g, farms: new Set(), tot: 0, M: 0, F: 0, el: 0, elM: 0, elF: 0, lot: 0, why: {} });
+    x.farms.add(a.farm); x.tot++; if (a.m) x.M++; else x.F++;
+    if (R.eligIds.has(a.id)) { x.el++; if (a.m) x.elM++; else x.elF++; if (lot.has(a.id)) x.lot++; }
+    else { const k = R.ST[a.id] || 'Fora dos critérios escolhidos (sexo, exploração, raça, pontuação, peso ou idade)'; x.why[k] = (x.why[k] || 0) + 1; }
+  });
+  return P;
+}
+function renderPens(R) {
+  const P = penStats(R); const sel = S.pensOn || [];
+  const arr = Object.values(P).filter((x) => x.el || sel.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  const mx = Math.max(1, ...arr.map((x) => x.el));
+  $('pens').innerHTML = arr.map((x) => { const on = !sel.length || sel.indexOf(x.g) >= 0; return `<label class="pen${on ? '' : ' off'}" title="${esc(x.g)}: ${nf(x.tot)} animais no parque · ${nf(x.el)} elegíveis · ${nf(x.lot)} no lote"><input type="checkbox" data-pen="${esc(x.g)}" ${sel.indexOf(x.g) >= 0 ? 'checked' : ''}><span class="mono">${esc(x.g)}</span><div class="bar"><div style="width:${Math.round(100 * x.el / mx)}%;${x.lot ? '' : 'background:#B9C7BE'}"></div></div><span style="text-align:right">${nf(x.lot)} / ${nf(x.el)}</span></label>`; }).join('') || '<span class="note">Nenhum parque com animais elegíveis.</span>';
+  $('penNote').textContent = sel.length ? nf(sel.length) + ' parque' + (sel.length > 1 ? 's' : '') + ' selecionado' + (sel.length > 1 ? 's' : '') + ' · o lote usa só estes. Número: no lote / elegíveis.' : 'Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Número: animais no lote / elegíveis no parque.';
+}
+function exportPens() {
+  const R = LAST_R; if (!R) return; const P = penStats(R); const lot = new Set(R.out.map((o) => o.a.id)); const sel = S.pensOn || [];
+  const rows = Object.values(P).sort((x, y) => (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  const whyK = {}; rows.forEach((x) => Object.keys(x.why).forEach((k) => { whyK[k] = (whyK[k] || 0) + x.why[k]; }));
+  const wk = Object.keys(whyK).sort((x, y) => whyK[y] - whyK[x]);
+  const head = ['Parque', 'Exploração', 'Selecionado', 'Total no parque', 'Machos', 'Fêmeas', 'Elegíveis', 'Elegíveis M', 'Elegíveis F', 'No lote', 'Não elegíveis'].concat(wk.map((k) => 'Não elegível: ' + k));
+  const aoa = [['Mercado: ' + R.m.label + ' · saída ' + fmt(R.L) + ' · gerado ' + fmt(TODAY)], head].concat(rows.map((x) => [x.g, Array.from(x.farms).join(', '), sel.indexOf(x.g) >= 0 ? 'Sim' : (sel.length ? 'Não' : 'Todos'), x.tot, x.M, x.F, x.el, x.elM, x.elF, x.lot, x.tot - x.el].concat(wk.map((k) => x.why[k] || 0))));
+  const T = rows.reduce((s, x) => { s.tot += x.tot; s.M += x.M; s.F += x.F; s.el += x.el; s.elM += x.elM; s.elF += x.elF; s.lot += x.lot; return s; }, { tot: 0, M: 0, F: 0, el: 0, elM: 0, elF: 0, lot: 0 });
+  aoa.push(['Total', '', '', T.tot, T.M, T.F, T.el, T.elM, T.elF, T.lot, T.tot - T.el].concat(wk.map((k) => whyK[k])));
+  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = head.map((h, i) => ({ wch: i < 2 ? 16 : Math.min(28, Math.max(10, h.length > 40 ? 22 : h.length + 2)) })); ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 1, c: 0 }, e: { r: aoa.length - 1, c: head.length - 1 } }) };
+  const L = R.L;
+  const ah = ['N.º SIA', 'Parque', 'Exploração', 'Sexo', 'Raça', 'Idade à saída (meses)', 'Alocação', 'Última pesagem (kg)', 'Data última pesagem', 'Peso previsto à saída (kg)', 'Elegível', 'No lote', 'Motivo (se não elegível)'];
+  const an = DB.rows.slice().sort((x, y) => String(x.g).localeCompare(String(y.g), 'pt', { numeric: true }) || (kgAt(y, L) || 0) - (kgAt(x, L) || 0)).map((a) => { const el = R.eligIds.has(a.id);
+    return ['PT' + a.id, a.g, a.farm, a.m ? 'M' : 'F', a.breed, a.b > 0 ? months(a.b, L) : '', String(a.alloc).trim(), a.w || '', a.wd > 0 ? { t: 'n', v: a.wd + 25569, z: 'dd-mm-yyyy' } : '', kgAt(a, L) || '', el ? 'Sim' : 'Não', lot.has(a.id) ? 'Sim' : 'Não', el ? (lot.has(a.id) ? '' : (R.ST[a.id] || 'Elegível, fora do lote')) : (R.ST[a.id] || 'Fora dos critérios escolhidos (sexo, exploração, raça, pontuação, peso ou idade)')]; });
+  const ws2 = XLSX.utils.aoa_to_sheet([ah].concat(an)); ws2['!cols'] = ah.map((h) => ({ wch: Math.max(10, Math.min(40, h.length + 2)) })); ws2['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: an.length, c: ah.length - 1 } }) };
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Parques'); XLSX.utils.book_append_sheet(wb, ws2, 'Animais');
+  XLSX.writeFile(wb, 'Parques_' + String(R.m.label).replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_') + '_' + fmt(L) + '.xlsx');
+}
+document.addEventListener('change', (e) => { const t = e.target; if (t && t.dataset && t.dataset.pen !== undefined && t.closest('#pens')) { const g = t.dataset.pen; const s = (S.pensOn || []).slice(); const i = s.indexOf(g); if (t.checked && i < 0) s.push(g); if (!t.checked && i >= 0) s.splice(i, 1); S.pensOn = s; render(); } });
+$('penAll').onclick = () => { S.pensOn = []; render(); };
+$('penExp').onclick = () => exportPens();
 function download(name, text) {
   const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
