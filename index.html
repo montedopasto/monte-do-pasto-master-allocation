@@ -232,7 +232,7 @@ if (location.protocol !== 'file:') document.documentElement.classList.add('mdp-l
     <div class="cols">
       <section class="card"><h2 style="font-size:17px">Porque ficaram de fora</h2><span class="note" id="popNote"></span><div id="reasons"></div></section>
       <section class="card"><h2 style="font-size:17px" id="rulesTitle">Regras aplicadas</h2><div id="rules"></div></section>
-      <section class="card" style="flex:2 1 460px"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:17px">Onde estão</h2><span style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn link" id="penAll">Todos os parques</button><button type="button" class="btn link" id="penExp">Exportar quadro (Excel)</button></span></div><span class="note" id="penNote">Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Passe o rato em "Não elegíveis" para ver os motivos.</span><div id="pens" style="max-height:420px;overflow:auto"></div></section>
+      <section class="card" style="flex:2 1 460px"><div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:17px">Onde estão</h2><span style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn link" id="penAll">Todos os parques</button><button type="button" class="btn link" id="penExp">Exportar quadro (PDF)</button></span></div><span class="note" id="penNote">Marque parques para usar só esses no lote. Sem nenhum marcado, a app usa todos. Passe o rato em "Não elegíveis" para ver os motivos.</span><div id="pens" style="max-height:420px;overflow:auto"></div></section>
     </div>
     <section class="card">
       <div class="rowsb" style="flex-wrap:wrap"><h2 style="font-size:19px">Animais disponíveis</h2><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button type="button" class="btn" id="expBtn">Exportar (Excel)</button><span class="note" id="expMsg" role="status"></span></div></div>
@@ -1345,7 +1345,35 @@ function exportPens() {
 }
 document.addEventListener('change', (e) => { const t = e.target; if (t && t.dataset && t.dataset.pen !== undefined && t.closest('#pens')) { const g = t.dataset.pen; const s = (S.pensOn || []).slice(); const i = s.indexOf(g); if (t.checked && i < 0) s.push(g); if (!t.checked && i >= 0) s.splice(i, 1); S.pensOn = s; render(); } });
 $('penAll').onclick = () => { S.pensOn = []; render(); };
-$('penExp').onclick = () => exportPens();
+function exportPensPdf() {
+  const R = LAST_R; if (!R) return; const P = penStats(R); const sel = S.pensOn || [];
+  const arr = Object.values(P).filter((x) => x.el || sel.indexOf(x.g) >= 0).sort((x, y) => (y.lot - x.lot) || (y.el - x.el) || x.g.localeCompare(y.g, 'pt', { numeric: true }));
+  const T = arr.reduce((s, x) => { s.tot += x.tot; s.el += x.el; s.lot += x.lot; return s; }, { tot: 0, el: 0, lot: 0 });
+  const nLot = R.out.length; const nM = R.out.filter((o) => o.a.m).length; const ks = R.out.map((o) => o.kg).filter((x) => x); const av = ks.length ? Math.round(ks.reduce((s, x) => s + x, 0) / ks.length) : 0;
+  const title = 'Parques_' + String(R.m.label).replace(/[^\wÀ-ſ-]+/g, '_').replace(/_+/g, '_') + '_' + fmt(R.L);
+  const logo = (document.querySelector('.hbrand img') || {}).src || '';
+  const rows = arr.map((x) => { const on = !sel.length || sel.indexOf(x.g) >= 0; return `<tr class="${on ? '' : 'off'}"><td class="c">${sel.indexOf(x.g) >= 0 ? '☑' : '☐'}</td><td class="mono">${esc(x.g)}</td><td>${esc(Array.from(x.farms).join(', '))}</td><td class="n">${nf(x.tot)}</td><td class="n"><b>${nf(x.el)}</b></td><td class="n">${nf(x.tot - x.el)}</td><td class="n">${x.lot ? '<b class="g">' + nf(x.lot) + '</b>' : '0'}</td></tr>`; }).join('');
+  const html = `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  @page{size:A4;margin:14mm}body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1F2A24;font-size:11px;margin:0}
+  .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #4A0E0E;padding-bottom:8px;margin-bottom:10px}.h img{height:38px}
+  h1{font-size:17px;color:#4A0E0E;margin:0;text-transform:uppercase;letter-spacing:.02em}.sub{color:#5C6660;margin:3px 0 0}
+  .k{display:flex;gap:18px;flex-wrap:wrap;background:#F4F1EC;border-radius:6px;padding:8px 10px;margin-bottom:10px}.k b{font-size:13px}
+  table{width:100%;border-collapse:collapse}th{text-align:left;font-size:10px;color:#5C6660;border-bottom:1.5px solid #CFC8BC;padding:5px 6px}th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+  td{padding:4px 6px;border-bottom:1px solid #ECE7DF}td.c{width:14px;font-size:13px}.mono{font-family:Consolas,monospace}tr.off td{color:#8A938E}.g{color:#247305}
+  tfoot td{border-top:2px solid #4A0E0E;font-weight:700;border-bottom:0}thead{display:table-header-group}tr{page-break-inside:avoid}
+  .f{margin-top:8px;color:#5C6660;font-size:9.5px}</style></head><body>
+  <div class="h"><div><h1>Onde estão · parques</h1><p class="sub">${esc(R.m.label)} · saída ${fmt(R.L)} · gerado a ${fmt(TODAY)}</p></div>${logo ? `<img src="${logo}" alt="Monte do Pasto">` : ''}</div>
+  <div class="k"><span>Lote: <b>${nf(nLot)}</b> animais (${nf(nM)} M · ${nf(nLot - nM)} F)</span><span>Peso médio previsto: <b>${av ? nf(av) + ' kg' : '—'}</b></span><span>Parques: <b>${sel.length ? nf(sel.length) + ' selecionados' : 'todos'}</b></span><span>Fonte: ${esc(DB.source)}</span></div>
+  <table><thead><tr><th></th><th>Parque</th><th>Exploração</th><th class="n">Total parque</th><th class="n">Elegíveis</th><th class="n">Não elegíveis</th><th class="n">No lote</th></tr></thead><tbody>${rows}</tbody>
+  <tfoot><tr><td></td><td>Total</td><td></td><td class="n">${nf(T.tot)}</td><td class="n">${nf(T.el)}</td><td class="n">${nf(T.tot - T.el)}</td><td class="n">${nf(T.lot)}</td></tr></tfoot></table>
+  <p class="f">☑ parque selecionado para o lote. Elegíveis: cumprem as regras de ${esc(R.m.label)} e os critérios do Simulador nesta data. Monte do Pasto · Master Allocation.</p></body></html>`;
+  let fr = document.getElementById('pdfFrame'); if (fr) fr.remove();
+  fr = document.createElement('iframe'); fr.id = 'pdfFrame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
+  const d = fr.contentWindow.document; d.open(); d.write(html); d.close();
+  const old = document.title; document.title = title;
+  setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(() => { document.title = old; }, 1000); } }, 400);
+}
+$('penExp').onclick = () => exportPensPdf();
 function download(name, text) {
   const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
